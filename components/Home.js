@@ -1,5 +1,4 @@
 import {
-  TextInput,
   View,
   Text,
   SafeAreaView,
@@ -7,420 +6,520 @@ import {
   TouchableOpacity,
   Image,
   ScrollView,
-  Dimensions
+  Dimensions,
+  ActivityIndicator,
+  StatusBar,
 } from "react-native";
+import React, { useState, useEffect } from "react";
+import { db } from "../FirebaseConfig";
+import { collection, getDocs, orderBy, query, limit } from "firebase/firestore";
+import AppHeader from "./Header";
+import { LinearGradient } from "expo-linear-gradient";
 
 const { width, height } = Dimensions.get("window");
 
 const Home = ({ navigation }) => {
+  const [stories, setStories] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [bookmarkedStories, setBookmarkedStories] = useState(new Set());
+
+  useEffect(() => {
+    const fetchStories = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const storiesCollectionRef = collection(db, "stories");
+        const q = query(
+          storiesCollectionRef,
+          orderBy("createdAt", "desc"),
+          limit(20)
+        );
+
+        const querySnapshot = await getDocs(q);
+        const fetchedStories = querySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+
+        setStories(fetchedStories);
+      } catch (error) {
+        console.error("Error fetching stories: ", error);
+        setError("Failed to fetch stories. Please try again later.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStories();
+  }, []);
+
+  const handleViewStory = (story) => {
+    navigation.navigate("StoryDetails", {
+      storyId: story.id,
+      story: story,
+    });
+  };
+
+  const handleBookmark = (story) => {
+    const newBookmarkedStories = new Set(bookmarkedStories);
+    if (bookmarkedStories.has(story.id)) {
+      newBookmarkedStories.delete(story.id);
+    } else {
+      newBookmarkedStories.add(story.id);
+    }
+    setBookmarkedStories(newBookmarkedStories);
+    console.log("Bookmarking story:", story.title);
+  };
+
+  const renderBookItem = (item) => (
+    <TouchableOpacity
+      key={item.id}
+      style={styles.bookItem}
+      onPress={() => handleViewStory(item)}
+      activeOpacity={0.8}
+    >
+      <View style={styles.bookImageContainer}>
+        {item.imageUrl ? (
+          <Image
+            source={{ uri: item.imageUrl }}
+            style={styles.bookImage}
+            onError={() => console.log("Failed to load image:", item.imageUrl)}
+          />
+        ) : (
+          <LinearGradient
+            colors={["#FF6B6B", "#FF8E8E"]}
+            style={[styles.bookImage, styles.placeholderImage]}
+          >
+            <Text style={styles.placeholderText}>📚</Text>
+          </LinearGradient>
+        )}
+        <View style={styles.categoryBadge}>
+          <Text style={styles.categoryBadgeText}>
+            {item.category?.substring(0, 3).toUpperCase() || "STY"}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.bookInfo}>
+        <Text style={styles.storyTitle} numberOfLines={2}>
+          {item.title || "Untitled Story"}
+        </Text>
+
+        {item.author && (
+          <Text style={styles.storyAuthor} numberOfLines={1}>
+            by {item.author}
+          </Text>
+        )}
+
+        <View style={styles.bookActions}>
+          <TouchableOpacity
+            style={styles.readButton}
+            onPress={() => handleViewStory(item)}
+          >
+            <Text style={styles.readButtonText}>Read Now</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.bookmarkButton}
+            onPress={() => handleBookmark(item)}
+          >
+            <Text style={styles.bookmarkIcon}>
+              {bookmarkedStories.has(item.id) ? "🔖" : "🏷️"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+
+  const renderCategoryCard = (category, image, gradient) => (
+    <TouchableOpacity
+      key={category}
+      style={styles.categoryCard}
+      onPress={() => handleCategoryPress(category)}
+      activeOpacity={0.8}
+    >
+      <LinearGradient colors={gradient} style={styles.categoryGradient}>
+        <Image source={image} style={styles.categoryImage} />
+        <View style={styles.categoryOverlay}>
+          <Text style={styles.categoryText}>{category}</Text>
+        </View>
+      </LinearGradient>
+    </TouchableOpacity>
+  );
+
+  const handleCategoryPress = (category) => {
+    navigation.navigate("CategoriesTab", { selectedCategory: category });
+  };
+
+  const categoryData = [
+    {
+      name: "Fables",
+      image: require("../books/bawal.png"),
+      gradient: ["#FF6B6B", "#FF8E8E"],
+    },
+    {
+      name: "Folktales",
+      image: require("../books/buhok.png"),
+      gradient: ["#4ECDC4", "#44A08D"],
+    },
+    {
+      name: "Legends",
+      image: require("../books/pinya.png"),
+      gradient: ["#A8E6CF", "#88D8A3"],
+    },
+    {
+      name: "Myths",
+      image: require("../books/rihawani.png"),
+      gradient: ["#FFD93D", "#FF9A3D"],
+    },
+  ];
 
   return (
-    <SafeAreaView style={{ width: "100%", height: "100%" }}>
-      <View>
-        <View
-          style={{
-            marginTop: 30,
-            marginLeft: 10,
-            marginRight: 10,
-            marginBottom: 20,
-          }}
-        >
-          <View style={styles.header}>
-            <TouchableOpacity onPress={()=>navigation.navigate('Profile')}>
-              <Image
-                source={require("../icons/circle-user.png")}
-                style={{
-                  width: 30,
-                  height: 30,
-                  alignSelf: "center",
-                  marginRight: "auto",
-                }}
-              />
-              </TouchableOpacity>
-              <Text
-                style={{
-                  fontWeight: "bold",
-                  fontFamily: "sans-serif-medium",
-                  fontSize: 18,
-                  marginTop: 8,
-                  alignSelf: "center",
-                  marginBottom: 10,
-                  marginLeft: 5,
-                  color: "red",
-                }}
-              >
-                Kwentura
-              </Text>
-              <TouchableOpacity>
-              <Image
-                source={require("../icons/bell.png")}
-                style={{
-                  width: 30,
-                  height: 30,
-                  alignSelf: "center",
-                  marginLeft: "auto",
-                }}
-              />
-              </TouchableOpacity>
-          </View>
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FAFAFA" />
 
-          <View style={{flexDirection: 'row', display: 'flex', borderWidth: 1, width: '85%', alignSelf: 'center', backgroundColor: '#d3d3d3', borderRadius: 5}}>
-                <TextInput
-                style={{ borderWidth: 1, width: "75%", alignSelf: "center", marginLeft: 40, borderWidth: 0, fontSize: 16, marginTop: 2}}
-                placeholder="Search Stories"/>
-                <Image source={require('../icons/search.png')} style={{width: 30, height: 30, marginTop: 6, position: "absolute",marginLeft: 10,}} />
-            </View>
-        </View>
-      </View>
+      <AppHeader
+        navigation={navigation}
+        leftIconType="drawer"
+        showSearch={true}
+      />
 
-      <View style={{ paddingLeft: 10, paddingRight: 10 }}>
-        <View style={{ flexDirection: "row" }}>
-          <Text style={{ fontFamily: "sans-serif-medium", fontWeight: "bold" }}>
-            Categories
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollViewContent}
+      >
+        {/* Welcome Section */}
+        <View style={styles.welcomeSection}>
+          <Text style={styles.welcomeTitle}>Discover Amazing Stories</Text>
+          <Text style={styles.welcomeSubtitle}>
+            Explore Filipino tales, legends, and folklore
           </Text>
+        </View>
 
-          <TouchableOpacity style={{ marginLeft: "auto" }}>
-            <Text
-              style={{ fontFamily: "sans-serif-medium", fontWeight: "bold" }}
+        {/* Categories Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Browse Categories</Text>
+            <TouchableOpacity
+              onPress={() => navigation.navigate("CategoriesTab")}
             >
-              View All
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <View style={styles.categContainer}>
-        <View>
-          <TouchableOpacity>
-            <Image
-              source={require("../books/bawal.png")}
-              style={styles.categories}
-            />
-          </TouchableOpacity>
-          <Text style={styles.categoryText}>Fables</Text>
-        </View>
-
-        <View>
-          <TouchableOpacity>
-            <Image
-              source={require("../books/buhok.png")}
-              style={styles.categories}
-            />
-          </TouchableOpacity>
-          <Text style={styles.categoryText}>Folktales</Text>
-        </View>
-
-        <View>
-          <TouchableOpacity>
-            <Image
-              source={require("../books/pinya.png")}
-              style={styles.categories}
-            />
-          </TouchableOpacity>
-          <Text style={styles.categoryText}>Legends</Text>
-        </View>
-
-        <View>
-          <TouchableOpacity>
-            <Image
-              source={require("../books/rihawani.png")}
-              style={styles.categories}
-            />
-          </TouchableOpacity>
-          <Text style={styles.categoryText}>Myths</Text>
-        </View>
-      </View>
-
-      <View
-        style={{
-          borderBottomColor: "black",
-          borderBottomWidth: 1,
-          marginTop: 10,
-          marginBottom: 10,
-        }}
-      ></View>
-
-      <ScrollView>
-        <View style={{ paddingLeft: 10, paddingRight: 10 }}>
-          <View style={{ flexDirection: "row" }}>
-            <Text
-              style={{ fontFamily: "sans-serif-medium", fontWeight: "bold" }}
-            >
-              Recently Viewed
-            </Text>
-
-            <TouchableOpacity style={{ marginLeft: "auto" }}>
-              <Text style={{ fontFamily: "sans-serif-medium" }}>View All</Text>
+              <Text style={styles.viewAllText}>View All →</Text>
             </TouchableOpacity>
           </View>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoriesContainer}
+          >
+            {categoryData.map((category) =>
+              renderCategoryCard(
+                category.name,
+                category.image,
+                category.gradient
+              )
+            )}
+          </ScrollView>
         </View>
 
-        <View style={styles.bookContainer}>
-          <View>
-            <Image
-              source={require("../books/bawal.png")}
-              style={styles.books}
-            />
+        {/* Featured Stories Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>
+              Featured Stories ({stories.length})
+            </Text>
+          </View>
 
-            <View style={styles.row}>
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#FF6B6B" />
+              <Text style={styles.loadingText}>
+                Discovering amazing stories...
+              </Text>
+            </View>
+          ) : error ? (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorIcon}>📚</Text>
+              <Text style={styles.errorText}>{error}</Text>
               <TouchableOpacity
-                style={styles.Button}
-                onPress={() => navigation.navigate("Bawal")}
+                style={styles.retryButton}
+                onPress={() => {
+                  setError(null);
+                  fetchStories();
+                }}
               >
-                <Text style={styles.text}>View Story</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity>
-                <Image
-                  source={require("../icons/bookmark-red.png")}
-                  style={styles.bookmark}
-                />
+                <Text style={styles.retryText}>Try Again</Text>
               </TouchableOpacity>
             </View>
-          </View>
-
-          <View>
-            <Image
-              source={require("../books/sandangaw.png")}
-              style={styles.books}
-            />
-
-            <View style={styles.row}>
-              <TouchableOpacity style={styles.Button}>
-                <Text style={styles.text}>View Story</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity>
-                <Image
-                  source={require("../icons/bookmark-clicked.png")}
-                  style={styles.bookmark}
-                />
-              </TouchableOpacity>
+          ) : stories.length > 0 ? (
+            <View style={styles.storiesGrid}>
+              {stories.map(renderBookItem)}
             </View>
-          </View>
-
-          <View>
-            <Image source={require("../books/jack.png")} style={styles.books} />
-
-            <View style={styles.row}>
-              <TouchableOpacity style={styles.Button}>
-                <Text style={styles.text}>View Story</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity>
-                <Image
-                  source={require("../icons/bookmark-red.png")}
-                  style={styles.bookmark}
-                />
-              </TouchableOpacity>
+          ) : (
+            <View style={styles.noStoriesContainer}>
+              <Text style={styles.noStoriesIcon}>📖</Text>
+              <Text style={styles.noStoriesText}>No stories found</Text>
+              <Text style={styles.noStoriesSubtext}>
+                Check your internet connection or try again later
+              </Text>
             </View>
-          </View>
-        </View>
-
-        <View style={{ paddingLeft: 10, paddingRight: 10, marginTop: 15 }}>
-          <View style={{ flexDirection: "row" }}>
-            <Text
-              style={{ fontFamily: "sans-serif-medium", fontWeight: "bold" }}
-            >
-              New Release
-            </Text>
-
-            <TouchableOpacity style={{ marginLeft: "auto" }}>
-              <Text style={{ fontFamily: "sans-serif-medium" }}>View All</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={styles.bookContainer}>
-          <View>
-            <Image
-              source={require("../books/kalipay.png")}
-              style={styles.books}
-            />
-
-            <View style={styles.row}>
-              <TouchableOpacity style={styles.Button}>
-                <Text style={styles.text}>View Story</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity>
-                <Image
-                  source={require("../icons/bookmark-clicked.png")}
-                  style={styles.bookmark}
-                />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          <View>
-            <Image source={require("../books/lola.png")} style={styles.books} />
-
-            <View style={styles.row}>
-              <TouchableOpacity style={styles.Button}>
-                <Text style={styles.text}>View Story</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity>
-                <Image
-                  source={require("../icons/bookmark-red.png")}
-                  style={styles.bookmark}
-                />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          <View>
-            <Image source={require("../books/tuko.png")} style={styles.books} />
-
-            <View style={styles.row}>
-              <TouchableOpacity style={styles.Button}>
-                <Text style={styles.text}>View Story</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity>
-                <Image
-                  source={require("../icons/bookmark-red.png")}
-                  style={styles.bookmark}
-                />
-              </TouchableOpacity>
-            </View>
-          </View>
+          )}
         </View>
       </ScrollView>
-
-      <View
-        style={{
-          borderBottomColor: "black",
-          borderBottomWidth: 1,
-          marginTop: "auto",
-        }}
-      ></View>
-
-      <View style={styles.navigation}>
-        <TouchableOpacity
-          style={styles.navButton}
-          onPress={() => navigation.navigate("Home")}
-        >
-          <Image
-            source={require("../icons/home-red.png")}
-            style={styles.icons}
-          />
-          <Text style={{ color: "red" }}>Home</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.navButton}
-          onPress={() => navigation.navigate("Categories")}
-        >
-          <Image
-            source={require("../icons/category.png")}
-            style={styles.icons}
-          />
-          <Text>Categories</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.navButton} onPress={() => navigation.navigate("Search")}>
-          <Image source={require("../icons/search.png")} style={styles.icons} />
-          <Text>Search</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.navButton} onPress={() => navigation.navigate("Library")}>
-          <Image
-            source={require("../icons/bookmark.png")}
-            style={styles.icons}
-          />
-          <Text>Library</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.navButton} onPress={() => navigation.navigate("Profile")}>
-          <Image source={require("../icons/user.png")} style={styles.icons} />
-          <Text>Profile</Text>
-        </TouchableOpacity>
-      </View>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  navigation: {
-    marginTop: "auto",
-    height: 70,
-    width: "100%",
-    flexDirection: "row",
-    justifyContent: "space-evenly",
-    marginBottom: 20,
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#FAFAFA",
   },
-  navButton: {},
-  categories: {
-    width: 90,
-    height: 90,
-    borderWidth: 1,
-    borderRadius: 8,
-    resizeMode: "contain",
+  scrollView: {
+    flex: 1,
   },
-  categContainer: {
+  scrollViewContent: {
+    paddingBottom: 30,
+  },
+  welcomeSection: {
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    alignItems: "center",
+  },
+  welcomeTitle: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#333",
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  welcomeSubtitle: {
+    fontSize: 16,
+    color: "#666",
+    textAlign: "center",
+    lineHeight: 22,
+  },
+  section: {
+    marginBottom: 30,
+  },
+  sectionHeader: {
     flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    marginBottom: 15,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#333",
+  },
+  viewAllText: {
+    fontSize: 14,
+    color: "#FF6B6B",
+    fontWeight: "600",
+  },
+  categoriesContainer: {
+    paddingLeft: 20,
     paddingRight: 10,
-    paddingLeft: 10,
-    paddingTop: 5,
-    justifyContent: "space-evenly",
   },
-  books: {
-    width: width * 0.3,
-    height: height * 0.2,
-    borderWidth: 1,
+  categoryCard: {
+    marginRight: 15,
+    borderRadius: 16,
+    overflow: "hidden",
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+  },
+  categoryGradient: {
+    width: width * 0.35,
+    height: width * 0.35,
+    justifyContent: "center",
+    alignItems: "center",
+    position: "relative",
+  },
+  categoryImage: {
+    width: "70%",
+    height: "70%",
     resizeMode: "cover",
+    borderRadius: 12,
   },
-  bookContainer: {
-    flexDirection: "row",
-    paddingRight: 10,
-    paddingLeft: 10,
-    paddingTop: 5,
-    justifyContent: "space-evenly",
-    marginTop: 12,
-  },
-  Button: {
-    backgroundColor: "red",
-    marginLeft: 3,
-    marginTop: 5,
-    borderRadius: 5,
-    width: width * 0.2,
-    height: height * 0.03,
-    alignSelf: "left",
-  },
-  text: {
-    alignSelf: "center",
-    marginRight: 0,
-    marginTop: 5,
-    fontSize: 12,
-    fontFamily: "sans-serif-medium",
-    color: "white",
+  categoryOverlay: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
   },
   categoryText: {
-    fontWeight: "bold",
-    alignSelf: "center",
-    marginTop: 3,
-    fontSize: 13,
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "600",
+    textAlign: "center",
   },
-  bookmark: {
-    width: 19,
-    height: 19,
-    marginLeft: 5,
-    marginTop: 5,
-    resizeMode: "contain",
-  },
-  row: {
+  storiesGrid: {
     flexDirection: "row",
+    flexWrap: "wrap",
+    paddingHorizontal: 10,
+    justifyContent: "space-between",
   },
-  header: {
+  bookItem: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    marginBottom: 20,
+    padding: 12,
+    width: width * 0.44,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  bookImageContainer: {
+    position: "relative",
+    marginBottom: 12,
+  },
+  bookImage: {
+    width: "100%",
+    height: height * 0.18,
+    borderRadius: 8,
+    backgroundColor: "#F0F0F0",
+  },
+  placeholderImage: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  placeholderText: {
+    fontSize: 24,
+  },
+  categoryBadge: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  categoryBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "600",
+  },
+  bookInfo: {
+    flex: 1,
+  },
+  storyTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 4,
+    lineHeight: 18,
+  },
+  storyAuthor: {
+    fontSize: 12,
+    color: "#666",
+    marginBottom: 12,
+    fontStyle: "italic",
+  },
+  bookActions: {
     flexDirection: "row",
-    marginBottom: 10,
-    justifyContent: 'space-between'
+    justifyContent: "space-between",
+    alignItems: "center",
   },
-  icons: {
-    margin: "auto",
-    width: 30,
-    height: 30,
+  readButton: {
+    backgroundColor: "#FF6B6B",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 15,
+    flex: 1,
+    marginRight: 8,
+  },
+  readButtonText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  bookmarkButton: {
+    padding: 6,
+  },
+  bookmarkIcon: {
+    fontSize: 16,
+  },
+  loadingContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 60,
+  },
+  loadingText: {
+    marginTop: 15,
+    fontSize: 16,
+    color: "#666",
+    fontWeight: "500",
+  },
+  errorContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 60,
+    paddingHorizontal: 40,
+  },
+  errorIcon: {
+    fontSize: 48,
+    marginBottom: 15,
+  },
+  errorText: {
+    textAlign: "center",
+    fontSize: 16,
+    color: "#666",
+    marginBottom: 20,
+    lineHeight: 22,
+  },
+  retryButton: {
+    backgroundColor: "#FF6B6B",
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 25,
+  },
+  retryText: {
+    color: "#FFFFFF",
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  noStoriesContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 60,
+    paddingHorizontal: 40,
+  },
+  noStoriesIcon: {
+    fontSize: 48,
+    marginBottom: 15,
+  },
+  noStoriesText: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 8,
+  },
+  noStoriesSubtext: {
+    textAlign: "center",
+    fontSize: 14,
+    color: "#666",
+    lineHeight: 20,
   },
 });
 

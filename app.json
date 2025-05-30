@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Kwentura",
-    "slug": "Kwentura",
+    "slug": "kwentura",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -27,8 +27,9 @@
     },
     "extra": {
       "eas": {
-        "projectId": "92431408-c2d8-46ae-bc99-e1b41a286751"
+        "projectId": "2fdfdea4-9bc4-4777-923c-fc0dbbac621b"
       }
-    }
+    },
+    "owner": "ithink"
   }
 }

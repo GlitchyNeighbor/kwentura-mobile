@@ -1,5 +1,4 @@
 import {
-  TextInput,
   View,
   Text,
   SafeAreaView,
@@ -7,271 +6,209 @@ import {
   TouchableOpacity,
   Image,
   ScrollView,
+  Dimensions,
 } from "react-native";
-
-import { Dimensions } from "react-native";
+import AppHeader from "./Header";
 
 const { width, height } = Dimensions.get("window");
 
-const Library = ({navigation}) => {
-
-  
+const Library = ({ navigation }) => {
   return (
-    <SafeAreaView style={{ width: "100%", height: "100%" }}>
-      <View> 
-            <View style={{ marginTop:30, marginLeft: 10 ,marginRight: 10, marginBottom: 20}}>
-                <View style={styles.header}>
-                  <Image source={require('../icons/circle-user.png')} style={{width: 30, height: 30, alignSelf: 'center', marginRight: 'auto'}}/>
-                  <Text
-                    style={{
-                      fontWeight: "bold",
-                      fontFamily: 'sans-serif-medium',
-                      fontSize: 18,
-                      marginTop: 8,
-                      alignSelf: "center",
-                      marginBottom: 10,
-                      color: 'red',
-                    }}
-                  >
-                  Kwentura
-                  </Text>
-                  <Image source={require('../icons/bell.png')} style={{width: 30, height: 30, alignSelf: 'center', marginLeft: 'auto'}}/>
-      
-                </View>
-            
-                <View style={{flexDirection: 'row', display: 'flex', borderWidth: 1, width: '85%', alignSelf: 'center', backgroundColor: '#d3d3d3', borderRadius: 5}}>
-                  <TextInput
-                  style={{ borderWidth: 1, width: "75%", alignSelf: "center", marginLeft: 40, borderWidth: 0, fontSize: 16, marginTop: 2}}
-                  placeholder="Search Stories"/>
-                  <Image source={require('../icons/search.png')} style={{width: 30, height: 30, marginTop: 6, position: "absolute",marginLeft: 10,}} />
-                </View>
-            </View>
-        </View>
-    
-    <ScrollView>
-      <View style={{ paddingLeft: 10, paddingRight: 10, }}>
-        <View style={{ flexDirection: "row" }}>
-          <Text style={{ fontFamily: 'sans-serif-medium', fontWeight: "bold",}}>
-            Fables (Pabula)
-          </Text>
+    <SafeAreaView style={styles.safeArea}>
+      <AppHeader
+        navigation={navigation}
+        leftIconType="drawer"
+        showSearch={true}
+      />
 
+      <ScrollView>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Fables (Pabula)</Text>
           <TouchableOpacity style={{ marginLeft: "auto" }}>
-            <Text style={{ fontFamily: 'sans-serif-medium', fontWeight: "bold" }}>
-              View All
-            </Text>
+            <Text style={styles.viewAllText}>View All</Text>
           </TouchableOpacity>
         </View>
-      </View>
-
-      <View style={styles.bookContainer}>
-        <View>
-          <Image source={require('../books/sandangaw.png')}style={styles.books}/>
-          
-          <View style={styles.row}> 
-            <TouchableOpacity style={styles.Button}>
+        <View style={styles.bookContainer}>
+          <View style={styles.bookItem}>
+            <Image
+              source={require("../books/sandangaw.png")}
+              style={styles.books}
+            />
+            <View style={styles.row}>
+              <TouchableOpacity style={styles.Button}>
                 <Text style={styles.text}>View Story</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity> 
-              <Image source={require('../icons/bookmark-clicked.png')} style={styles.bookmark}/>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View>
-          <Image source={require('../books/palay.png')}style={styles.books}/>
-
-          <View style={styles.row}> 
-            <TouchableOpacity style={styles.Button}>
-                <Text style={styles.text}>View Story</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity> 
-              <Image source={require('../icons/bookmark-clicked.png')} style={styles.bookmark}/>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View>
-          <Image source={require('../books/kalabaw.png')}style={styles.books}/>
-          
-
-          <View style={styles.row}> 
-            <TouchableOpacity style={styles.Button}>
-                <Text style={styles.text}>View Story</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity> 
-              <Image source={require('../icons/bookmark-clicked.png')} style={styles.bookmark}/>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-
-
-      <View style={styles.bookContainer}>
-        <View>
-          <Image source={require('../books/buhok.png')}style={styles.books}/>
-          
-          <View style={styles.row}> 
-            <TouchableOpacity style={styles.Button}>
-                <Text style={styles.text}>View Story</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity> 
-              <Image source={require('../icons/bookmark-red.png')} style={styles.bookmark}/>
-            </TouchableOpacity>
-          </View>
-
-        </View>
-
-            <View>
-              <Image source={require('../books/kalabaw.png')}style={styles.books}/>
-          
-              <View style={styles.row}> 
-                  <TouchableOpacity style={styles.Button}>
-                      <Text style={styles.text}>View Story</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity> 
-                  <Image source={require('../icons/bookmark-clicked.png')} style={styles.bookmark}/>
-                  </TouchableOpacity>
-              </View>
+              </TouchableOpacity>
+              <TouchableOpacity>
+                <Image
+                  source={require("../icons/bookmark-clicked.png")}
+                  style={styles.bookmark}
+                />
+              </TouchableOpacity>
             </View>
-            <View>
-              <Image source={require('../books/tuko.png')}style={styles.books}/>
-          
-              <View style={styles.row}> 
-                  <TouchableOpacity style={styles.Button}>
-                      <Text style={styles.text}>View Story</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity> 
-                  <Image source={require('../icons/bookmark-red.png')} style={styles.bookmark}/>
-                  </TouchableOpacity>
-              </View>
+          </View>
+          <View style={styles.bookItem}>
+            <Image
+              source={require("../books/palay.png")}
+              style={styles.books}
+            />
+            <View style={styles.row}>
+              <TouchableOpacity style={styles.Button}>
+                <Text style={styles.text}>View Story</Text>
+              </TouchableOpacity>
+              <TouchableOpacity>
+                <Image
+                  source={require("../icons/bookmark-clicked.png")}
+                  style={styles.bookmark}
+                />
+              </TouchableOpacity>
             </View>
+          </View>
+          <View style={styles.bookItem}>
+            <Image
+              source={require("../books/kalabaw.png")}
+              style={styles.books}
+            />
+            <View style={styles.row}>
+              <TouchableOpacity style={styles.Button}>
+                <Text style={styles.text}>View Story</Text>
+              </TouchableOpacity>
+              <TouchableOpacity>
+                <Image
+                  source={require("../icons/bookmark-clicked.png")}
+                  style={styles.bookmark}
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
 
+        <View style={styles.bookContainer}>
+          <View style={styles.bookItem}>
+            <Image
+              source={require("../books/buhok.png")}
+              style={styles.books}
+            />
+            <View style={styles.row}>
+              <TouchableOpacity style={styles.Button}>
+                <Text style={styles.text}>View Story</Text>
+              </TouchableOpacity>
+              <TouchableOpacity>
+                <Image
+                  source={require("../icons/bookmark-red.png")}
+                  style={styles.bookmark}
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+          <View style={styles.bookItem}>
+            <Image
+              source={require("../books/kalabaw.png")}
+              style={styles.books}
+            />
+            <View style={styles.row}>
+              <TouchableOpacity style={styles.Button}>
+                <Text style={styles.text}>View Story</Text>
+              </TouchableOpacity>
+              <TouchableOpacity>
+                <Image
+                  source={require("../icons/bookmark-clicked.png")}
+                  style={styles.bookmark}
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+          <View style={styles.bookItem}>
+            <Image source={require("../books/tuko.png")} style={styles.books} />
+            <View style={styles.row}>
+              <TouchableOpacity style={styles.Button}>
+                <Text style={styles.text}>View Story</Text>
+              </TouchableOpacity>
+              <TouchableOpacity>
+                <Image
+                  source={require("../icons/bookmark-red.png")}
+                  style={styles.bookmark}
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
       </ScrollView>
-
-      <View
-        style={{
-          borderBottomColor: "black",
-          borderBottomWidth: 1,
-          marginTop: 10,
-        }}
-      ></View>
-
-      <View style={styles.navigation}>
-            <TouchableOpacity style={styles.navButton} onPress={()=>navigation.navigate('Home')}>
-            <Image source={require('../icons/home.png')} style={styles.icons} />
-            <Text>Home</Text>
-            </TouchableOpacity>
-      
-            <TouchableOpacity style={styles.navButton} onPress={()=>navigation.navigate('Categories')}>
-            <Image source={require('../icons/category.png')} style={styles.icons}/>
-            <Text >Categories</Text>
-            </TouchableOpacity>
-      
-            <TouchableOpacity style={styles.navButton} onPress={() => navigation.navigate("Search")}>
-              <Image source={require("../icons/search.png")} style={styles.icons} />
-              <Text>Search</Text>
-            </TouchableOpacity>
-      
-            <TouchableOpacity style={styles.navButton} onPress={() => navigation.navigate("Library")}>
-            <Image source={require('../icons/bookmark-red.png')} style={styles.icons} />
-            <Text style={{color: 'red',}}>Library</Text>
-            </TouchableOpacity>
-      
-            <TouchableOpacity style={styles.navButton} onPress={() => navigation.navigate("Profile")}>
-            <Image source={require('../icons/user.png')} style={styles.icons} />
-            <Text>Profile</Text>
-            </TouchableOpacity>
-        </View>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  navigation: {
-    marginTop: "auto",
-    height: 70,
-    width: "100%",
-    flexDirection: "row",
-    justifyContent: "space-evenly",
-    marginBottom: 20,
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#fff",
   },
-  navButton: {
 
-  },
-  categories: {
-    width: 90,
-    height: 90,
-    borderWidth: 1,
-    borderRadius: 8,
-  },
-  categContainer: {
+  sectionHeader: {
     flexDirection: "row",
-    paddingRight: 10,
-    paddingLeft: 10,
-    paddingTop: 5,
-    justifyContent: "space-evenly",
+    paddingHorizontal: 10,
+    marginTop: 15,
+    marginBottom: 5,
+    alignItems: "center",
+  },
+  sectionTitle: {
+    fontFamily: "sans-serif-medium",
+    fontWeight: "bold",
+    fontSize: 16,
+  },
+  viewAllText: {
+    fontFamily: "sans-serif-medium",
+    fontWeight: "bold",
+    fontSize: 14,
+    color: "red",
   },
   books: {
-    width: width * 0.3,
-    height: height *0.2,
+    width: width * 0.28,
+    height: height * 0.18,
     borderWidth: 1,
-    resizeMode: 'cover',
+    borderColor: "#ddd",
+    resizeMode: "cover",
+    borderRadius: 4,
   },
   bookContainer: {
     flexDirection: "row",
-    paddingTop: 5,
-    justifyContent: "space-evenly",
-    flex: 1,
-    marginTop: 12,
+    flexWrap: "wrap",
+    paddingHorizontal: 5,
+    justifyContent: "space-around",
+    marginTop: 10,
   },
-  Button: { 
-    backgroundColor: 'red',
-    marginLeft: 3,
-    marginTop: 5,
+  bookItem: {
+    marginBottom: 20,
+    alignItems: "center",
+    width: width * 0.3,
+  },
+  Button: {
+    backgroundColor: "red",
+    marginTop: 8,
     borderRadius: 5,
-    width: width * 0.2,
-    height: height * 0.03,
-    alignSelf: 'left',
-  }, 
-  text: { 
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    alignSelf: "flex-start",
+    marginRight: 5,
+  },
+  text: {
     alignSelf: "center",
-    marginRight: 0,
-    marginTop: 5, 
-    fontSize: width * 0.03, 
-    fontFamily: 'sans-serif-medium', 
-    color: 'white',
-  }, 
-  categoryText: { 
-    fontWeight: 'bold',
-    alignSelf: "center", 
-    marginTop: 3,
-    fontSize: 13,
-  }, 
-  bookmark: { 
-    width: 19, 
-    height: 19,
-    marginLeft: 5,
-    marginTop: 5,
-    resizeMode: 'contain',
+    fontSize: 11,
+    fontFamily: "sans-serif-medium",
+    color: "white",
   },
-  row: { 
-    flexDirection: 'row',
-  }, 
-  icons: { 
-    margin: "auto", 
-    width: 30, 
-    height: 30
+  bookmark: {
+    width: 22,
+    height: 22,
+    marginTop: 8,
+    resizeMode: "contain",
   },
-  header: {
-    flexDirection: 'row',
-    marginBottom: 10,
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 2,
+    width: "100%",
+    justifyContent: "center",
+    paddingHorizontal: 3,
   },
 });
 

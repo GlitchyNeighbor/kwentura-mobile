@@ -5,17 +5,16 @@ import { initializeAuth, getReactNativePersistence } from "firebase/auth";
 import ReactNativeAsyncStorage from "@react-native-async-storage/async-storage"
 import { getFirestore } from "firebase/firestore"
 import { getStorage } from "firebase/storage"
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
 
-// Your web app's Firebase configuration
+
 const firebaseConfig = {
-  apiKey: "AIzaSyC2TdJ_a1JklA42c-Irix5T8Syl-5hwNr8",
-  authDomain: "kwentura-3139d.firebaseapp.com",
-  projectId: "kwentura-3139d",
-  storageBucket: "kwentura-3139d.firebasestorage.app",
-  messagingSenderId: "559511714454",
-  appId: "1:559511714454:web:5b2f4c0d1f755c352e60b7"
+  apiKey: "AIzaSyBySBosjKeJ4l-iQ5Ll1OOo40RaPCeBlwo",
+  authDomain: "kwentura-39597.firebaseapp.com",
+  projectId: "kwentura-39597",
+  storageBucket: "kwentura-39597.firebasestorage.app",
+  messagingSenderId: "516248841412",
+  appId: "1:516248841412:web:b72100855b78de0e27ed91",
+  measurementId: "G-SNX7VNLBD5"
 };
 
 // Initialize Firebase
