@@ -23,7 +23,7 @@ import { signOut as firebaseSignOut } from "firebase/auth";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import AppHeader from "./HeaderProfile";
-import { getUnlockedAnimalAvatars } from "./Rewards";
+import { getUnlockedAnimalAvatars } from "./rewardsConfig";
 
 // const rewardsConfig = [
 //   { 
