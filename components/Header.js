@@ -3,7 +3,6 @@ import { View, Text, TouchableOpacity, StyleSheet, Image } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { auth, db } from "../FirebaseConfig"; // Adjust path as needed
 import { doc, onSnapshot } from "firebase/firestore";
-import { rewardsConfig } from "./rewardsConfig";
 import { useProfile } from '../context/ProfileContext';
 
 const Header = ({ navigation, leftIconType = "drawer" }) => {
@@ -60,7 +59,6 @@ const Header = ({ navigation, leftIconType = "drawer" }) => {
   return (
     <View style={styles.container}>
       
-      
       <View style={styles.starContainer}>
         {Array.from({ length: userStars }).map((_, index) => (
           <Image
@@ -73,7 +71,6 @@ const Header = ({ navigation, leftIconType = "drawer" }) => {
       <Image source={require('../images/Rainbow.png')} style={styles.Rainbow} />  
 
       <View style={styles.headerRow}>
-        {/* Fixed: Single TouchableOpacity for avatar */}
         <TouchableOpacity onPress={handleProfilePress}>
           {profileData.avatarConfig ? (
             <Image
@@ -92,7 +89,6 @@ const Header = ({ navigation, leftIconType = "drawer" }) => {
           onPress={handleLeftIconPress}
           style={styles.iconButton}
         >
-          {/* You can add an icon here if needed */}
         </TouchableOpacity>  
 
         <View style={[styles.ratingBox, { marginLeft: 'auto' }]}>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   View,
   SafeAreaView,
@@ -10,7 +10,8 @@ import {
   TouchableOpacity,
   ImageBackground,
   Alert,
-  TouchableWithoutFeedback
+  TouchableWithoutFeedback,
+  FlatList,
 } from "react-native";
 import { doc, getDoc, updateDoc, increment, setDoc, collection } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
@@ -21,15 +22,13 @@ import Animated, {
   withTiming,
   withSpring,
   runOnJS,
-  useAnimatedGestureHandler,
   withSequence,
   withRepeat,
 } from "react-native-reanimated";
-import {
-  PanGestureHandler,
-  GestureHandlerRootView,
-} from "react-native-gesture-handler";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Audio } from 'expo-av';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getCachedUri } from "../services/preloadService";
 
 import AppHeader from "./HeaderReadStory";
 
@@ -53,10 +52,10 @@ const ReadStory = ({ route, navigation }) => {
   const [showUI, setShowUI] = useState(true); // State to control UI visibility
   const uiOpacity = useSharedValue(1); // For animating UI visibility
   
+  const flatListRef = useRef(null);
+
   // Animation values
-  const flip = useSharedValue(0);
   const speakerScale = useSharedValue(1);
-  const buttonPulse = useSharedValue(1);
   const starRotation = useSharedValue(0);
   const sparkleOpacity = useSharedValue(0);
   const completionScale = useSharedValue(0);
@@ -142,56 +141,31 @@ const ReadStory = ({ route, navigation }) => {
       setLoading(true);
       setError(null);
       setImagesReady(false);
+  
       try {
+        // Try to load from cache first
+        const cachedStory = await AsyncStorage.getItem(`story_${storyId}`);
+        if (cachedStory) {
+          const { data, timestamp } = JSON.parse(cachedStory);
+          // Cache is valid for 1 hour
+          if (new Date().getTime() - timestamp < 3600000) { 
+            console.log("Loading story from cache");
+            await processStoryData(data);
+            setLoading(false);
+            return;
+          }
+        }
+  
+        // If not in cache or cache is invalid, fetch from Firestore
+        console.log("Fetching story from Firestore");
         const storyRef = doc(db, "stories", storyId);
         const docSnap = await getDoc(storyRef);
-
+  
         if (docSnap.exists()) {
           const data = docSnap.data();
-          let images = [];
-          let texts = [];
-          
-          // Get story title and author
-          setStoryTitle(data.title || "");
-          setStoryAuthor(data.author || "");
-          
-          // Get audio URLs
-          if (data.ttsAudioData && Array.isArray(data.ttsAudioData)) {
-            setAudioData(data.ttsAudioData);
-          }
-          
-          if (Array.isArray(data.pageImages)) {
-            images = data.pageImages;
-          } else if (data.pageImages && typeof data.pageImages === "object") {
-            images = Object.keys(data.pageImages)
-              .sort((a, b) => Number(a) - Number(b))
-              .map((k) => data.pageImages[k]);
-          }
-          
-          if (Array.isArray(data.pageTexts)) {
-            texts = data.pageTexts;
-          } else if (data.pageTexts && typeof data.pageTexts === "object") {
-            texts = Object.keys(data.pageTexts)
-              .sort((a, b) => Number(a) - Number(b))
-              .map((k) => data.pageTexts[k]);
-          }
-          setPageTexts(texts);
-          
-          if (images.length > 0) {
-            // Skip the first image (cover)
-            const contentImages = images.slice(1);
-            setPageImages(contentImages);
-            const prefetches = contentImages.map((url) => Image.prefetch(url));
-            Promise.all(prefetches)
-              .then(() => setImagesReady(true))
-              .catch((e) => {
-                console.error("Error prefetching images:", e);
-                setImagesReady(true);
-              });
-          } else {
-            setError("Story or page images not found.");
-            setImagesReady(true);
-          }
+          // Cache the fetched data with a timestamp
+          await AsyncStorage.setItem(`story_${storyId}`, JSON.stringify({ data, timestamp: new Date().getTime() }));
+          await processStoryData(data);
         } else {
           setError("Story not found.");
           setImagesReady(true);
@@ -203,6 +177,53 @@ const ReadStory = ({ route, navigation }) => {
       }
       setLoading(false);
     }
+  
+    async function processStoryData(data) {
+      let images = [];
+      let texts = [];
+  
+      setStoryTitle(data.title || "");
+      setStoryAuthor(data.author || "");
+  
+      if (Array.isArray(data.pageImages)) {
+        images = data.pageImages;
+      } else if (data.pageImages && typeof data.pageImages === "object") {
+        images = Object.keys(data.pageImages)
+          .sort((a, b) => Number(a) - Number(b))
+          .map((k) => data.pageImages[k]);
+      }
+  
+      if (Array.isArray(data.pageTexts)) {
+        texts = data.pageTexts;
+      } else if (data.pageTexts && typeof data.pageTexts === "object") {
+        texts = Object.keys(data.pageTexts)
+          .sort((a, b) => Number(a) - Number(b))
+          .map((k) => data.pageTexts[k]);
+      }
+      setPageTexts(texts);
+  
+      if (images.length > 0) {
+        const contentImages = images.slice(1);
+        const cachedImages = await Promise.all(contentImages.map(getCachedUri));
+        setPageImages(cachedImages);
+
+        if (data.ttsAudioData && Array.isArray(data.ttsAudioData)) {
+          const cachedAudioData = await Promise.all(
+            data.ttsAudioData.map(async (audio) => ({
+              ...audio,
+              audioUrl: await getCachedUri(audio.audioUrl),
+            }))
+          );
+          setAudioData(cachedAudioData);
+        }
+
+        setImagesReady(true);
+      } else {
+        setError("Story or page images not found.");
+        setImagesReady(true);
+      }
+    }
+  
     fetchPages();
   }, [storyId]);
 
@@ -227,7 +248,7 @@ const ReadStory = ({ route, navigation }) => {
         playAudio(audioData[currentPage]);
       }
     }
-  }, [currentPage, imagesReady, pageTexts, showCompletion]);
+  }, [currentPage, imagesReady, pageTexts, showCompletion, audioData]);
 
   // Cleanup audio when component unmounts or loses focus
   useEffect(() => {
@@ -255,27 +276,9 @@ const ReadStory = ({ route, navigation }) => {
     };
   }, [currentAudio, navigation]);
 
-  // Reset flip animation when page changes
-  useEffect(() => {
-    flip.value = 0;
-  }, [currentPage]);
-
-  // Enhanced flip animation with bounce
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [
-      { perspective: 1000 },
-      { rotateY: `${flip.value}deg` },
-    ],
-  }));
-
   // Speaker animation
   const speakerAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: speakerScale.value }],
-  }));
-
-  // Button pulse animation
-  const buttonAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: buttonPulse.value }],
   }));
 
   // Star rotation animation
@@ -301,22 +304,6 @@ const ReadStory = ({ route, navigation }) => {
   const uiAnimatedStyle = useAnimatedStyle(() => ({
     opacity: uiOpacity.value,
   }));
-
-  // Enhanced gesture handler with haptic feedback
-  const gestureHandler = useAnimatedGestureHandler({
-    onStart: () => {
-      buttonPulse.value = withSpring(0.95);
-    },
-    onEnd: (event, ctx) => {
-      buttonPulse.value = withSpring(1);
-      
-      if (event.translationX > 80 && currentPage > 0) {
-        runOnJS(goToPreviousPage)();
-      } else if (event.translationX < -80 && currentPage < pageImages.length - 1) {
-        runOnJS(goToNextPage)();
-      }
-    },
-  });
 
   // Play audio function
   const playAudio = async (audioUrl) => {
@@ -350,6 +337,19 @@ const ReadStory = ({ route, navigation }) => {
     }
   };
 
+  const onViewableItemsChanged = useRef(({ viewableItems }) => {
+    if (viewableItems.length > 0) {
+      const newIndex = viewableItems[0].index;
+      if (newIndex !== currentPage) {
+        setCurrentPage(newIndex);
+      }
+    }
+  }).current;
+
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 50
+  }).current;
+
   // Enhanced navigation functions
   const goToPreviousPage = () => {
     if (currentPage > 0) {
@@ -358,13 +358,7 @@ const ReadStory = ({ route, navigation }) => {
         setCurrentAudio(null);
       }
       setShowCompletion(false);
-      const newPage = currentPage - 1;
-      setCurrentPage(newPage); // Update state immediately
-      flip.value = withSpring(180, { damping: 15 }); // Animate
-      buttonPulse.value = withSequence(
-        withSpring(1.1),
-        withSpring(1)
-      );
+      flatListRef.current.scrollToIndex({ animated: true, index: currentPage - 1 });
     }
   };
 
@@ -375,13 +369,7 @@ const ReadStory = ({ route, navigation }) => {
         setCurrentAudio(null);
       }
       setShowCompletion(false);
-      const newPage = currentPage + 1;
-      setCurrentPage(newPage); // Update state immediately
-      flip.value = withSpring(-180, { damping: 15 }); // Animate
-      buttonPulse.value = withSequence(
-        withSpring(1.1),
-        withSpring(1)
-      );
+      flatListRef.current.scrollToIndex({ animated: true, index: currentPage + 1 });
     } else {
       if (currentAudio) {
         currentAudio.unloadAsync();
@@ -408,15 +396,6 @@ const ReadStory = ({ route, navigation }) => {
     } else {
       playAudio(audioData[currentPage]);
     }
-  };
-
-  const handleReadAgain = () => {
-    if (currentAudio) {
-      currentAudio.unloadAsync();
-      setCurrentAudio(null);
-    }
-    setShowCompletion(false);
-    setCurrentPage(0);
   };
 
   const handleBackToStories = () => {
@@ -464,6 +443,18 @@ const ReadStory = ({ route, navigation }) => {
         </View>
       </View>
     </Animated.View>
+  );
+
+  const renderPage = ({ item }) => (
+    <View style={styles.pageImageContainer}>
+      <View style={styles.imageFrame}>
+        <Image
+          source={{ uri: item }}
+          style={styles.pageImage}
+          resizeMode="contain"
+        />
+      </View>
+    </View>
   );
 
   if (loading || !imagesReady) {
@@ -529,17 +520,18 @@ const ReadStory = ({ route, navigation }) => {
                 <Animated.Text style={[styles.decorativeSparkle, styles.bottomLeft, sparkleAnimatedStyle]}>⭐</Animated.Text>
                 <Animated.Text style={[styles.decorativeSparkle, styles.bottomRight, sparkleAnimatedStyle]}>✨</Animated.Text>
 
-                <PanGestureHandler onGestureEvent={gestureHandler}>
-                  <Animated.View style={[styles.pageImageContainer, animatedStyle, buttonAnimatedStyle]}>
-                    <View style={styles.imageFrame}>
-                      <Image
-                        source={{ uri: pageImages[currentPage] }}
-                        style={styles.pageImage}
-                        resizeMode="contain"
-                      />
-                    </View>
-                  </Animated.View>
-                </PanGestureHandler>
+                <FlatList
+                  ref={flatListRef}
+                  data={pageImages}
+                  renderItem={renderPage}
+                  keyExtractor={(item, index) => index.toString()}
+                  horizontal
+                  pagingEnabled
+                  showsHorizontalScrollIndicator={false}
+                  onViewableItemsChanged={onViewableItemsChanged}
+                  viewabilityConfig={viewabilityConfig}
+                  onScrollToIndexFailed={()=>{}}
+                />
                 
 
                 {/* Enhanced Listen Button */}
@@ -632,8 +624,6 @@ const styles = StyleSheet.create({
   },
   container: { 
     flex: 1, 
-    justifyContent: "center", 
-    alignItems: "center",
   },
   centered: { 
     flex: 1, 
@@ -801,11 +791,10 @@ const styles = StyleSheet.create({
   bottomLeft: { bottom: 160, left: 25 },
   bottomRight: { bottom: 180, right: 20 },
   pageImageContainer: {
-    width: width * 1,
-    height: height * 1,
+    width: width,
+    height: height * 0.8,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 20,
   },
   imageFrame: {
     backgroundColor: 'white',
@@ -818,7 +807,6 @@ const styles = StyleSheet.create({
     elevation: 10,
     borderWidth: 3,
     borderColor: '#FFD700',
-    width:'100%',
   },
   pageImage: { 
     width: width * 0.85, 

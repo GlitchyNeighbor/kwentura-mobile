@@ -1,30 +1,14 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Image, StatusBar, Platform } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, Image, StatusBar } from "react-native";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { auth, db } from "../FirebaseConfig"; // Adjust path as needed
 import { doc, onSnapshot } from "firebase/firestore";
-import { rewardsConfig } from "./rewardsConfig";
-
-const AVATAR_OPTIONS = [
-  require("../assets/avatars/boy.png"),
-  require("../assets/avatars/boy2.png"),
-  require("../assets/avatars/boy3.png"),
-  require("../assets/avatars/boy4.png"),
-  require("../assets/avatars/boy5.png"),
-  require("../assets/avatars/boy6.png"),
-  require("../assets/avatars/girl.png"),
-  require("../assets/avatars/girl2.png"),
-  require("../assets/avatars/girl3.png"),
-  require("../assets/avatars/girl4.png"),
-  require("../assets/avatars/girl5.png"),
-  require("../assets/avatars/girl6.png"),
-];
+import { useProfile } from '../context/ProfileContext';
 
 const HeaderReadStory = ({ navigation }) => {
-  const [avatarConfig, setAvatarConfig] = useState(null);
+  const { profileData } = useProfile();
   const [userStars, setUserStars] = useState(0);
-  const [loading, setLoading] = useState(true);
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
@@ -32,10 +16,9 @@ const HeaderReadStory = ({ navigation }) => {
     const currentUser = auth.currentUser;
 
     if (currentUser) {
-      // Listen to users collection for stars data
-      const userDocRef = doc(db, "users", currentUser.uid);
+      const studentDocRef = doc(db, "students", currentUser.uid);
       const unsubscribeUsers = onSnapshot(
-        userDocRef,
+        studentDocRef,
         (docSnap) => {
           if (docSnap.exists()) {
             const userData = docSnap.data();
@@ -50,45 +33,21 @@ const HeaderReadStory = ({ navigation }) => {
         }
       );
 
-      // Listen to students collection for avatar data
-      const studentDocRef = doc(db, "students", currentUser.uid);
-      const unsubscribeStudents = onSnapshot(
-        studentDocRef,
-        (docSnap) => {
-          if (docSnap.exists()) {
-            const data = docSnap.data();
-            // Use animal avatar index
-            if (typeof data.avatarConfig === "number") {
-              setAvatarConfig(rewardsConfig[data.avatarConfig]?.image);
-            } else {
-              setAvatarConfig(data.avatarConfig ?? null);
-            }
-          } else {
-            setAvatarConfig(null);
-          }
-          setLoading(false);
-        },
-        (error) => {
-          console.error("Error fetching user data:", error);
-          setAvatarConfig(null);
-          setLoading(false);
-        }
-      );
-
       unsubscribe = () => {
         unsubscribeUsers();
-        unsubscribeStudents();
       };
     } else {
-      setAvatarConfig(null);
       setUserStars(0);
-      setLoading(false);
     }
 
     return () => {
       if (unsubscribe) unsubscribe();
     };
   }, []);
+
+  const handleProfilePress = () => {
+    navigation.navigate("ProfileStack", { screen: "ProfileMain" });
+  };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -110,25 +69,27 @@ const HeaderReadStory = ({ navigation }) => {
           <Ionicons name="arrow-back" size={20} color="white" />
         </TouchableOpacity>  
 
-        <View style={[styles.ratingBox, { marginLeft: 'auto', marginRight: 5 }]}>
-          <View style={styles.ratingContainer}>
-            <Ionicons name="star" size={15} color="#ffde24ff" style={styles.starIcon} />
-            <Text style={styles.ratingNumber}>{userStars}</Text>
-          </View>
-        </View>  
-
-        {/* Avatar - non-clickable, just display */}
-        {avatarConfig ? (
-          <Image
-            source={avatarConfig}
-            style={styles.notificationCircle}
-          />
-        ) : (
-          <Image
-            source={require("../assets/avatars/default_profile.png")}
-            style={styles.notificationCircle}
-          />
-        )}
+        <View style={styles.rightContainer}>
+          <View style={[styles.ratingBox, { marginRight: 5 }]}>
+            <View style={styles.ratingContainer}>
+              <Ionicons name="star" size={15} color="#ffde24ff" style={styles.starIcon} />
+              <Text style={styles.ratingNumber}>{userStars}</Text>
+            </View>
+          </View>    
+          <TouchableOpacity onPress={handleProfilePress}>
+            {profileData.avatarConfig ? (
+              <Image
+                source={profileData.avatarConfig}
+                style={styles.notificationCircle}
+              />
+            ) : (
+              <Image
+                source={require("../assets/avatars/default_profile.png")}
+                style={styles.notificationCircle}
+              />
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -142,7 +103,6 @@ const styles = StyleSheet.create({
     right: 0,
     width: "100%",
     zIndex: 1000,
-    // Remove the negative top value that was causing positioning issues
   },
   headerRow: {
     flexDirection: "row",
@@ -153,11 +113,15 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     color: "#414141",
   },
+  rightContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   notificationCircle: {
-    borderRadius: 15,
-    backgroundColor: "#969696ff",
-    width: 30,
-    height: 30,
+    borderRadius: 100,
+    backgroundColor: "#979797bd",
+    width: 35,
+    height: 35,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -189,7 +153,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center'
   },
-  // Background decorative elements with adjusted positioning
   Rainbow: {
     position: 'absolute',
     top: -100,

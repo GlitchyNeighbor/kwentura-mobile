@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react"; // Import useRef
 import { useFonts } from 'expo-font';
+// import * as SplashScreen from 'expo-splash-screen';
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { NavigationContainer, CommonActions } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -857,6 +858,8 @@ function App() {
 }
 
 
+import { preloadAllStories } from "./services/preloadService";
+
 export default function AppWrapper() {
   const [fontsLoaded, fontError] = useFonts({
     'Fredoka-SemiBold': require('./assets/fonts/Fredoka-SemiBold.ttf'),
@@ -865,6 +868,13 @@ export default function AppWrapper() {
     // 'Poppins-Regular': require('./assets/fonts/Poppins-Regular.ttf'),
     // 'Poppins-SemiBold': require('./assets/fonts/Poppins-SemiBold.ttf'),
   });
+
+  useEffect(() => {
+    const preload = async () => {
+      await preloadAllStories();
+    };
+    preload();
+  }, []);
 
   const onLayoutRootView = useCallback(async () => {
     if (fontsLoaded || fontError) {

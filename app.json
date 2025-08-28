@@ -30,6 +30,12 @@
         "projectId": "2fdfdea4-9bc4-4777-923c-fc0dbbac621b"
       }
     },
-    "owner": "ithink"
+    "owner": "ithink",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/2fdfdea4-9bc4-4777-923c-fc0dbbac621b"
+    }
   }
 }
