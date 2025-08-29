@@ -50,21 +50,6 @@ const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 const Drawer = createDrawerNavigator();
 
-const AVATAR_OPTIONS = [
-  require("./assets/avatars/boy.png"),
-  require("./assets/avatars/boy2.png"),
-  require("./assets/avatars/boy3.png"),
-  require("./assets/avatars/boy4.png"),
-  require("./assets/avatars/boy5.png"),
-  require("./assets/avatars/boy6.png"),
-  require("./assets/avatars/girl.png"),
-  require("./assets/avatars/girl2.png"),
-  require("./assets/avatars/girl3.png"),
-  require("./assets/avatars/girl4.png"),
-  require("./assets/avatars/girl5.png"),
-  require("./assets/avatars/girl6.png"),
-];
-
 // --- Timer Configuration (moved from index.html) ---
 const DAILY_USAGE_LIMIT_MS = 90 * 60 * 1000; // 90 minutes in milliseconds
 

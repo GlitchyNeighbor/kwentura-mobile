@@ -14,6 +14,8 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
+import { getAuth, sendPasswordResetEmail } from 'firebase/auth';
+import { auth } from '../FirebaseConfig';
 
 const ForgotPassword = ({ navigation }) => {
   const [emailOrPhone, setEmailOrPhone] = useState('');
@@ -63,19 +65,37 @@ const ForgotPassword = ({ navigation }) => {
     setErrors({});
     setIsLoading(true);
 
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Navigate to verification screen
-      navigation.navigate('ChooseVerify', { 
-        emailOrPhone: emailOrPhone.trim(),
-        isEmail: emailOrPhone.includes('@')
-      });
-    } catch (error) {
-      Alert.alert('Error', 'Something went wrong. Please try again.');
-    } finally {
-      setIsLoading(false);
+    const isEmail = emailOrPhone.includes('@');
+
+    if (isEmail) {
+      try {
+        await sendPasswordResetEmail(auth, emailOrPhone.trim());
+        Alert.alert(
+          'Password Reset Email Sent',
+          'Please check your email to reset your password.'
+        );
+        navigation.navigate('Login');
+      } catch (error) {
+        Alert.alert('Error', error.message);
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      // For phone numbers, navigate to the verification screen
+      try {
+        // Simulate API call
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        // Navigate to verification screen
+        navigation.navigate('ChooseVerify', { 
+          emailOrPhone: emailOrPhone.trim(),
+          isEmail: false
+        });
+      } catch (error) {
+        Alert.alert('Error', 'Something went wrong. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 

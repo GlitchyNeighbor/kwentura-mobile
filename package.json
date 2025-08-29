@@ -6,7 +6,8 @@
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "imagemin": "imagemin images/**/* --plugin=pngquant --out-dir=images"
   },
   "dependencies": {
     "@expo-google-fonts/fredoka-one": "^0.2.3",
@@ -25,6 +26,7 @@
     "expo-speech": "~13.0.1",
     "expo-status-bar": "~2.0.1",
     "firebase": "^11.8.1",
+    "lodash": "^4.17.21",
     "react": "18.3.1",
     "react-native": "0.76.9",
     "react-native-config": "^1.5.6",
@@ -44,7 +46,8 @@
     "@babel/core": "^7.20.0",
     "@react-native-community/cli": "^13.6.6",
     "@types/react": "~18.3.12",
-    
+    "imagemin-cli": "^8.0.0",
+    "imagemin-pngquant": "^10.0.0",
     "metro-react-native-babel-preset": "0.76.5",
     "react-native-dotenv": "^3.4.11",
     "typescript": "^5.3.3"

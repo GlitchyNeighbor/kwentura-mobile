@@ -19,25 +19,28 @@ import {
 } from "react-native";
 import { auth, db } from "../FirebaseConfig";
 import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
-import { signOut as firebaseSignOut } from "firebase/auth";
+import { signOut as firebaseSignOut, sendEmailVerification } from "firebase/auth";
 import { Ionicons } from "@expo/vector-icons";
 import AppHeader from "./HeaderProfileBackOnly";
 
 const { width } = Dimensions.get('window');
 
 const AVATAR_OPTIONS = [
-  require("../assets/avatars/boy.png"),
-  require("../assets/avatars/boy2.png"),
-  require("../assets/avatars/boy3.png"),
-  require("../assets/avatars/boy4.png"),
-  require("../assets/avatars/boy5.png"),
-  require("../assets/avatars/boy6.png"),
-  require("../assets/avatars/girl.png"),
-  require("../assets/avatars/girl2.png"),
-  require("../assets/avatars/girl3.png"),
-  require("../assets/avatars/girl4.png"),
-  require("../assets/avatars/girl5.png"),
-  require("../assets/avatars/girl6.png"),
+  require("../images/animals/Bee.png"),
+  require("../images/animals/Capybara.png"),
+  require("../images/animals/Cat.png"),
+  require("../images/animals/Chicken.png"),
+  require("../images/animals/Dog.png"),
+  require("../images/animals/Fox.png"),
+  require("../images/animals/Frog.png"),
+  require("../images/animals/Kangaroo.png"),
+  require("../images/animals/Ladybug.png"),
+  require("../images/animals/Lion.png"),
+  require("../images/animals/Ostrich.png"),
+  require("../images/animals/Parrot.png"),
+  require("../images/animals/Raccoon.png"),
+  require("../images/animals/Snail.png"),
+  require("../images/animals/Squirrel.png"),
 ];
 
 const PersonalInfo = ({ navigation }) => {
@@ -61,6 +64,7 @@ const PersonalInfo = ({ navigation }) => {
   const [avatarConfig, setAvatarConfig] = useState(AVATAR_OPTIONS[0]);
   const [avatarModalVisible, setAvatarModalVisible] = useState(false);
   const [selectedAvatar, setSelectedAvatar] = useState(null);
+  const [emailVerified, setEmailVerified] = useState(false);
 
   // Form validation state
   const [errors, setErrors] = useState({});
@@ -120,6 +124,7 @@ const PersonalInfo = ({ navigation }) => {
       if (user) {
         try {
           setLoading(true);
+          setEmailVerified(user.emailVerified);
           const docRef = doc(db, "students", user.uid);
           const docSnap = await getDoc(docRef);
 
@@ -174,6 +179,18 @@ const PersonalInfo = ({ navigation }) => {
 
     return () => unsubscribe();
   }, []);
+
+  const handleVerifyEmail = async () => {
+    const user = auth.currentUser;
+    if (user) {
+      try {
+        await sendEmailVerification(user);
+        Alert.alert("Verification Email Sent", "Please check your email to verify your account.");
+      } catch (error) {
+        Alert.alert("Error", error.message);
+      }
+    }
+  };
 
   const saveChanges = async () => {
     const user = auth.currentUser;
@@ -366,16 +383,38 @@ const PersonalInfo = ({ navigation }) => {
                 }
               )}
 
-              {renderInputField(
-                "Email Address",
-                formData.email,
-                (value) => updateFormData('email', value),
-                {
-                  keyboardType: "email-address",
-                  placeholder: "Enter email address",
-                  error: errors.email
-                }
-              )}
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Email Address</Text>
+                <View style={styles.emailContainer}>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      styles.emailInput,
+                      !auth.currentUser?.emailVerified && styles.unverifiedInput,
+                      auth.currentUser?.emailVerified && styles.readOnlyInput,
+                      errors.email && styles.inputError
+                    ]}
+                    value={formData.email}
+                    onChangeText={(value) => updateFormData('email', value)}
+                    editable={false}
+                    keyboardType="email-address"
+                    placeholder="Enter email address"
+                    placeholderTextColor="#999"
+                  />
+                  {!auth.currentUser?.emailVerified && (
+                    <TouchableOpacity
+                      style={styles.verifyButton}
+                      onPress={handleVerifyEmail}
+                    >
+                      <Text style={styles.verifyButtonText}>Verify</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
+                <Text style={emailVerified ? styles.verifiedText : styles.unverifiedText}>
+                  {emailVerified ? "Email is verified" : "Email is not verified"}
+                </Text>
+              </View>
 
               {renderInputField(
                 "Contact Number",
@@ -664,6 +703,43 @@ const styles = StyleSheet.create({
   confirmButtonText: {
     color: "#fff",
     fontWeight: "bold",
+  },
+  emailContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  emailInput: {
+    flex: 1,
+    borderTopRightRadius: 0,
+    borderBottomRightRadius: 0,
+  },
+  verifyButton: {
+    paddingHorizontal: 15,
+    height: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFCF2D',
+    borderTopRightRadius: 8,
+    borderBottomRightRadius: 8,
+  },
+  verifyButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  verifiedText: {
+    color: 'green',
+    fontSize: 12,
+    marginTop: 5,
+  },
+  unverifiedText: {
+    color: 'red',
+    fontSize: 12,
+    marginTop: 5,
+  },
+  unverifiedInput: {
+    borderColor: 'red',
+ght: "bold",
+ght: "bold",
   },
 });
 export default PersonalInfo;
