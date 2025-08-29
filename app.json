@@ -20,7 +20,8 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.shizzles.Kwentura"
+      "package": "com.kwentura.mobile",
+      "versionCode": 8
     },
     "web": {
       "favicon": "./assets/favicon.png"
