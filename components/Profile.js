@@ -467,21 +467,31 @@ const Profile = ({ navigation }) => {
           style: "destructive",
           onPress: async () => {
             const user = auth.currentUser;
-            if (user) {
-              try {
-                const userDocRef = doc(db, "students", user.uid);
-                await updateDoc(userDocRef, {
-                  activeSessionId: null,
-                });
-                await AsyncStorage.removeItem("userSessionId"); // Clear local session ID
-                await firebaseSignOut(auth);
-              } catch (error) {
-                console.error("Sign out error:", error);
-                Alert.alert("Error", "Sign out failed: " + error.message);
-              }
-            } else {
-                // If no user, just attempt to sign out
-                await firebaseSignOut(auth);
+            if (!user) {
+              // Should not happen if on this screen, but handle defensively.
+              firebaseSignOut(auth).catch(err => console.error("Sign out error (no user):", err));
+              return;
+            }
+
+            try {
+              // Perform cleanup tasks that must succeed before logging out.
+              const userDocRef = doc(db, "students", user.uid);
+              await updateDoc(userDocRef, {
+                activeSessionId: null,
+              });
+              await AsyncStorage.removeItem("userSessionId"); // Clear local session ID
+
+              // Initiate sign out. We don't show an alert in a .catch()
+              // to prevent a race condition where the component unmounts
+              // before the Alert can be displayed.
+              firebaseSignOut(auth).catch(err => {
+                console.error("Firebase sign out failed:", err);
+                // The user will remain logged in. They can try again.
+              });
+            } catch (error) {
+              // This catches errors from cleanup (updateDoc, AsyncStorage).
+              console.error("Sign out cleanup error:", error);
+              Alert.alert("Error", "An error occurred during sign-out. Please try again.");
             }
           }
         }
