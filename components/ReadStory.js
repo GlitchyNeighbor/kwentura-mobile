@@ -54,6 +54,9 @@ const ReadStory = ({ route, navigation }) => {
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const [showUI, setShowUI] = useState(true);
   const [isLandscape, setIsLandscape] = useState(false);
+  const [availableLanguages, setAvailableLanguages] = useState([]);
+  const [currentLanguage, setCurrentLanguage] = useState(null);
+  const [originalPageTexts, setOriginalPageTexts] = useState({});
   const uiOpacity = useSharedValue(1);
   
   const flatListRef = useRef(null);
@@ -75,13 +78,13 @@ const ReadStory = ({ route, navigation }) => {
 
     try {
       const userId = auth.currentUser.uid;
-      const progressRef = doc(db, "users", userId, "progress", storyId);
+      const progressRef = doc(db, "students", userId, "progress", storyId);
       
       const progressData = {
         id: storyId,
         title: storyData.title || "Untitled Story",
         author: storyData.author || "",
-        imageUrl: storyData.coverImage || "",
+        imageUrl: storyData.image || "",
         category: storyData.category || "",
         currentPage: pageIndex,
         totalPages: pageImages.length,
@@ -93,6 +96,23 @@ const ReadStory = ({ route, navigation }) => {
       console.log(`Progress saved: Page ${pageIndex + 1}/${pageImages.length}`);
     } catch (error) {
       console.error("Error saving progress:", error);
+    }
+  };
+
+  const handleLanguageToggle = () => {
+    if (availableLanguages.length < 2) return;
+
+    const currentIndex = availableLanguages.indexOf(currentLanguage);
+    const nextIndex = (currentIndex + 1) % availableLanguages.length;
+    const nextLanguage = availableLanguages[nextIndex];
+    setCurrentLanguage(nextLanguage);
+
+    // Stop any currently playing audio
+    if (currentAudio) {
+      currentAudio.unloadAsync();
+      setCurrentAudio(null);
+      setIsPlaying(false);
+      speakerScale.value = withSpring(1);
     }
   };
 
@@ -258,38 +278,33 @@ const ReadStory = ({ route, navigation }) => {
       setStoryAuthor(data.author || "");
       setStoryData(data); // Store complete story data
   
-      if (Array.isArray(data.pageImages)) {
-        images = data.pageImages;
-      } else if (data.pageImages && typeof data.pageImages === "object") {
-        images = Object.keys(data.pageImages)
-          .sort((a, b) => Number(a) - Number(b))
-          .map((k) => data.pageImages[k]);
-      }
-  
-      if (Array.isArray(data.pageTexts)) {
-        texts = data.pageTexts;
-      } else if (data.pageTexts && typeof data.pageTexts === "object") {
-        texts = Object.keys(data.pageTexts)
-          .sort((a, b) => Number(a) - Number(b))
-          .map((k) => data.pageTexts[k]);
-      }
-      setPageTexts(texts);
-  
-      if (images.length > 0) {
-        const contentImages = images.slice(1);
-        const cachedImages = await Promise.all(contentImages.map(getCachedUri));
+      // Determine available languages
+      const baseLang = data.language || 'fil-PH';
+      const translationKeys = data.translations ? Object.keys(data.translations) : [];
+      const uniqueLangs = [...new Set([baseLang, ...translationKeys])];
+      setAvailableLanguages(uniqueLangs);
+      setCurrentLanguage(baseLang);
+
+      // Store all page text variations
+      const allPageTexts = {
+        [baseLang]: data.pageTexts || [],
+        ...data.translations,
+      };
+      setOriginalPageTexts(allPageTexts);
+      setPageTexts(allPageTexts[baseLang] || []);
+
+      // Process page images
+      const imageSources = Array.isArray(data.pageImages)
+        ? data.pageImages
+        : data.pageImages && typeof data.pageImages === 'object'
+        ? Object.entries(data.pageImages)
+            .sort(([keyA], [keyB]) => parseInt(keyA.replace('page', '')) - parseInt(keyB.replace('page', '')))
+            .map(([, value]) => value)
+        : [];
+
+      if (imageSources.length > 0) {
+        const cachedImages = await Promise.all(imageSources.map(getCachedUri));
         setPageImages(cachedImages);
-
-        if (data.ttsAudioData && Array.isArray(data.ttsAudioData)) {
-          const cachedAudioData = await Promise.all(
-            data.ttsAudioData.map(async (audio) => ({
-              ...audio,
-              audioUrl: await getCachedUri(audio.audioUrl),
-            }))
-          );
-          setAudioData(cachedAudioData);
-        }
-
         setImagesReady(true);
       } else {
         setError("Story or page images not found.");
@@ -299,6 +314,33 @@ const ReadStory = ({ route, navigation }) => {
   
     fetchPages();
   }, [storyId]);
+
+  // Effect to update texts and audio when language changes
+  useEffect(() => {
+    if (!storyData || !currentLanguage) return;
+
+    // Update page texts
+    setPageTexts(originalPageTexts[currentLanguage] || []);
+
+    // Update audio data
+    const updateAudio = async () => {
+      const ttsForLanguage = storyData.ttsAudio?.[currentLanguage];
+      if (ttsForLanguage && Array.isArray(ttsForLanguage)) {
+        const cachedAudioData = await Promise.all(
+          ttsForLanguage.map(async (audio) => ({
+            ...audio,
+            audioUrl: await getCachedUri(audio.audioUrl),
+          }))
+        );
+        setAudioData(cachedAudioData);
+      } else {
+        console.log(`No TTS audio found for language: ${currentLanguage}`);
+        setAudioData([]);
+      }
+    };
+
+    updateAudio();
+  }, [currentLanguage, storyData, originalPageTexts]);
 
   // Scroll to initial page when images are ready
   useEffect(() => {
@@ -329,21 +371,22 @@ const ReadStory = ({ route, navigation }) => {
         currentAudio.unloadAsync();
       }
       
-      if (audioData[currentPage]) {
+      const audioForPage = audioData.find(audio => audio.pageNumber === currentPage + 1);
+      if (audioForPage) {
         setIsPlaying(true);
         speakerScale.value = withRepeat(
           withSequence(
             withSpring(1.2, { damping: 10 }),
             withSpring(1, { damping: 10 })
           ),
-          3,
+          -1, // Loop indefinitely while playing
           true
         );
         
-        playAudio(audioData[currentPage]);
+        playAudio(audioForPage);
       }
     }
-  }, [currentPage, imagesReady, pageTexts, showCompletion, audioData]);
+  }, [currentPage, imagesReady, showCompletion, audioData]);
 
   // Cleanup audio when component unmounts or loses focus
   useEffect(() => {
@@ -402,17 +445,17 @@ const ReadStory = ({ route, navigation }) => {
   }));
 
   // Play audio function
-  const playAudio = async (audioUrl) => {
+  const playAudio = async (audioInfo) => {
     setIsLoadingAudio(true);
     
     if (currentAudio) {
       await currentAudio.unloadAsync();
       setCurrentAudio(null);
     }
-
+  
     try {
       const { sound } = await Audio.Sound.createAsync(
-        { uri: audioUrl.audioUrl },
+        { uri: audioInfo.audioUrl },
         { shouldPlay: true },
         (status) => {
           if (status.didJustFinish) {
@@ -514,18 +557,19 @@ const ReadStory = ({ route, navigation }) => {
 
   // Enhanced TTS with visual feedback
   const handleSpeak = () => {
-    if (!audioData[currentPage]) {
+    const audioForPage = audioData.find(audio => audio.pageNumber === currentPage + 1);
+    if (!audioForPage) {
       Alert.alert("No Audio", "No audio is available for this page.");
       return;
     }
-
+  
     if (isPlaying && currentAudio) {
       currentAudio.unloadAsync();
       setIsPlaying(false);
       speakerScale.value = withSpring(1);
       setCurrentAudio(null);
     } else {
-      playAudio(audioData[currentPage]);
+      playAudio(audioForPage);
     }
   };
 
@@ -641,7 +685,9 @@ const ReadStory = ({ route, navigation }) => {
       <AppHeader
         navigation={navigation}
         leftIconType="drawer"
-        showSearch={true}
+        availableLanguages={availableLanguages}
+        currentLanguage={currentLanguage}
+        onLanguageToggle={handleLanguageToggle}
       />  
     )}
 

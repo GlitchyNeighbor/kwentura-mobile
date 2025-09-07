@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react"; // Import useRef
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useFonts } from 'expo-font';
 // import * as SplashScreen from 'expo-splash-screen';
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
@@ -16,6 +16,7 @@ import { ActivityIndicator, Alert } from "react-native"; // Import Alert from re
 import { auth, db } from "./FirebaseConfig";
 import { signOut as firebaseSignOut } from "firebase/auth";
 import { doc, getDoc, onSnapshot } from "firebase/firestore";
+import { AuthFlowProvider, useAuthFlow } from './context/AuthFlowContext';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { ProfileProvider } from './context/ProfileContext';
@@ -724,20 +725,38 @@ function RootNavigator() {
   const [initializing, setInitializing] = useState(true);
   const [user, setUser] = useState(null);
   const [isProfileComplete, setIsProfileComplete] = useState(null);
+  const [hasInitialDocument, setHasInitialDocument] = useState(null); // New state to track doc existence
+  const { isVerifyingEmail, registrationCompleted } = useAuthFlow();
+
+  // Use a ref to hold the latest value of isVerifyingEmail to avoid stale closures in the listener.
+  const isVerifyingEmailRef = useRef(isVerifyingEmail);
+  useEffect(() => {
+    isVerifyingEmailRef.current = isVerifyingEmail;
+  }, [isVerifyingEmail]);
   
+  // This effect handles the initial auth state check.
+  // It only sets the user and does not check for profile completeness yet.
+  // This prevents navigation races during registration.
   useEffect(() => {
     setInitializing(true);
-    setIsProfileComplete(null);
+
     const unsubscribeAuth = auth.onAuthStateChanged((userAuth) => {
-      setUser(userAuth);
-      if (!userAuth) {
-        setInitializing(false);
-        setIsProfileComplete(null);
+      // By reading from the ref, we get the *current* value of the flag,
+      // avoiding the race condition where the listener fires before the state update completes.
+      if (!isVerifyingEmailRef.current) {
+        setUser(userAuth);
+        if (!userAuth) {
+          setInitializing(false);
+          setIsProfileComplete(null);
+          setHasInitialDocument(null); // Reset new state on logout
+        }
       }
     });
     return unsubscribeAuth;
-  }, []);
+  }, []); // This effect should only run once on mount.
 
+  // This effect handles multi-device session validation.
+  // It runs only when the user object is available.
   // This useEffect handles multi-device session validation
   useEffect(() => {
     if (user) {
@@ -773,36 +792,49 @@ function RootNavigator() {
     }
   }, [user]);
 
+  // This effect checks for profile completeness once a user is authenticated.
+  // It's separate from the auth state listener to avoid race conditions.
+  // It's responsible for deciding the navigation path (App vs. CompleteProfile).
   useEffect(() => {
     if (user) {
-      setIsProfileComplete(null);
+      // Only reset states when the user changes, not on every registration check.
+      if (isProfileComplete === null) {
+        setIsProfileComplete(null);
+      }
       const docRef = doc(db, "students", user.uid);
       const unsubscribeSnapshot = onSnapshot(
         docRef,
         (docSnap) => {
-          if (docSnap.exists() && docSnap.data()?.schoolId) {
-            setIsProfileComplete(true);
+          const docExists = docSnap.exists();
+          setHasInitialDocument(docExists);
+
+          if (docExists) {
+            // A document exists. Now, check if it's fully complete (has a schoolId).
+            // This will be `false` after registration, triggering the navigation to StudDetails.
+            setIsProfileComplete(!!docSnap.data()?.schoolId);
           } else {
+            // No document exists, so the profile is definitely not complete.
             setIsProfileComplete(false);
           }
           setInitializing(false);
         },
         (error) => {
           console.error("Error listening to profile document:", error);
+          setHasInitialDocument(false);
           setIsProfileComplete(false);
           setInitializing(false);
         }
       );
       return () => unsubscribeSnapshot();
     } else {
-      if (initializing) {
-        setInitializing(false);
-      }
+      // No user, reset all states
+      setInitializing(false);
+      setHasInitialDocument(null);
       setIsProfileComplete(null);
     }
-  }, [user]);
+  }, [user?.uid, registrationCompleted]); // Add registrationCompleted as a dependency
 
-  if (initializing || (user && isProfileComplete === null)) {
+  if (initializing || (user && (isProfileComplete === null || hasInitialDocument === null))) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#FFCF2D" />
@@ -813,25 +845,21 @@ function RootNavigator() {
   return (
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {!user ? (
+        {!user || !user.emailVerified ? (
+          // 1. If no user or email is not verified, show Auth flow.
           <Stack.Screen name="Auth" component={AuthStack} />
-        ) : isProfileComplete ? (
-          <>
-            <Stack.Screen name="App">
-              {() => (
-                <ProfileProvider>
-                  <AppDrawer />
-                </ProfileProvider>
-              )}
-            </Stack.Screen>
-          </>
+        ) : hasInitialDocument === false ? (
+          // 2. User is verified, but NO Firestore doc exists. This is the state right after email verification.
+          // Keep them in the Auth stack to complete the registration form.
+          <Stack.Screen name="Auth" component={AuthStack} />
+        ) : isProfileComplete === true ? (
+          // 3. User is verified, doc exists, and profile is complete. Show the main app.
+          <Stack.Screen name="App">
+            {() => <ProfileProvider><AppDrawer /></ProfileProvider>}
+          </Stack.Screen>
         ) : (
-          <Stack.Screen
-            name="CompleteProfile"
-            component={StudDetails}
-            initialParams={{ userId: user.uid }}
-            options={{ gestureEnabled: false }}
-          />
+          // 4. User is verified, doc exists, but profile is INCOMPLETE. Route to StudDetails.
+          <Stack.Screen name="CompleteProfile" component={StudDetails} initialParams={{ userId: user.uid }} options={{ gestureEnabled: false }} />
         )}
       </Stack.Navigator>
     </NavigationContainer>
@@ -841,7 +869,9 @@ function RootNavigator() {
 function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <RootNavigator />
+      <AuthFlowProvider>
+        <RootNavigator />
+      </AuthFlowProvider>
     </GestureHandlerRootView>
   );
 }

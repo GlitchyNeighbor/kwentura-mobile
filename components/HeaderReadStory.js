@@ -6,7 +6,7 @@ import { auth, db } from "../FirebaseConfig"; // Adjust path as needed
 import { doc, onSnapshot } from "firebase/firestore";
 import { useProfile } from '../context/ProfileContext';
 
-const HeaderReadStory = ({ navigation }) => {
+const HeaderReadStory = ({ navigation, availableLanguages, currentLanguage, onLanguageToggle }) => {
   const { profileData } = useProfile();
   const [userStars, setUserStars] = useState(0);
   const insets = useSafeAreaInsets();
@@ -63,12 +63,23 @@ const HeaderReadStory = ({ navigation }) => {
         </TouchableOpacity>  
 
         <View style={styles.rightContainer}>
-          <View style={[styles.ratingBox, { marginRight: 5 }]}>
-            <View style={styles.ratingContainer}>
-              <Ionicons name="star" size={15} color="#ffde24ff" style={styles.starIcon} />
-              <Text style={styles.ratingNumber}>{userStars}</Text>
+          <View style={styles.statsContainer}>
+            <View style={[styles.ratingBox, { marginRight: 5 }]}>
+              <View style={styles.ratingContainer}>
+                <Ionicons name="star" size={15} color="#ffde24ff" style={styles.starIcon} />
+                <Text style={styles.ratingNumber}>{userStars}</Text>
+              </View>
             </View>
-          </View>    
+            {availableLanguages && availableLanguages.length > 1 && (
+              <TouchableOpacity
+                style={styles.languageButton}
+                onPress={onLanguageToggle}
+              >
+                <Ionicons name="language-outline" size={15} color="white" />
+                <Text style={styles.languageButtonText}>{currentLanguage === 'en-US' ? 'EN' : 'FIL'}</Text>
+              </TouchableOpacity>
+            )}
+          </View>
   
           <TouchableOpacity onPress={handleProfilePress}>
             {profileData.avatarConfig ? (
@@ -110,6 +121,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  statsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 10,
+  },
   notificationCircle: {
     borderRadius: 100,
     backgroundColor: "#979797bd",
@@ -147,6 +163,21 @@ const styles = StyleSheet.create({
   ratingNumber: {
     color: 'white',
     fontSize: 12,
+  },
+  languageButton: {
+    backgroundColor: '#979797bd',
+    borderRadius: 10,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  languageButtonText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginLeft: 5,
   },
   backButton: {
     backgroundColor: '#FFCF2D',

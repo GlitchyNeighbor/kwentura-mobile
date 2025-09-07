@@ -420,7 +420,7 @@ const Home = ({ navigation }) => {
 
   const loadUserBookmarks = (userId) => {
     try {
-      const bookmarksRef = collection(db, "users", userId, "bookmarks");
+      const bookmarksRef = collection(db, "students", userId, "bookmarks");
 
       // Real-time listener for bookmarks
       const unsubscribe = onSnapshot(
@@ -571,7 +571,7 @@ const Home = ({ navigation }) => {
     setBookmarkLoading(true);
 
     try {
-      const bookmarkRef = doc(db, "users", user.uid, "bookmarks", story.id);
+      const bookmarkRef = doc(db, "students", user.uid, "bookmarks", story.id);
       const isBookmarked = bookmarkedStories.has(story.id);
 
       if (isBookmarked) {

@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   SafeAreaView,
   ScrollView,
+  Image,
   Alert,
   ImageBackground,
 } from 'react-native';
@@ -202,6 +203,12 @@ const ComQuestions = ({ route, navigation }) => {
         <AppHeader navigation={navigation} hideStars={true} />
         <ScrollView contentContainerStyle={styles.scrollViewContent}>
           <Text style={styles.storyTitle}>{storyTitle}</Text>
+          
+          {displayQuestion.imageUrl && (
+            <View style={styles.imageContainer}>
+              <Image source={{ uri: displayQuestion.imageUrl }} style={styles.questionImage} resizeMode="contain" />
+            </View>
+          )}
           <View style={styles.questionContainer}>
             <Text style={styles.questionText}>{displayQuestion.question}</Text>
           </View>
@@ -265,6 +272,18 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.25)',
     textShadowOffset: { width: 1, height: 2 },
     textShadowRadius: 3,
+  },
+  imageContainer: {
+    width: '100%',
+    height: 200,
+    marginBottom: 20,
+    borderRadius: 15,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(0,0,0,0.2)',
+  },
+  questionImage: {
+    width: '100%',
+    height: '100%',
   },
   questionContainer: {
     backgroundColor: 'rgba(0,0,0,0.3)',

@@ -57,7 +57,7 @@ const Categories = ({ navigation }) => {
 
   const loadUserBookmarks = (userId) => {
     try {
-      const bookmarksRef = collection(db, "users", userId, "bookmarks");
+      const bookmarksRef = collection(db, "students", userId, "bookmarks");
       const unsubscribe = onSnapshot(
         bookmarksRef,
         (snapshot) => {
@@ -132,7 +132,7 @@ const Categories = ({ navigation }) => {
     }
     setBookmarkLoading(true);
     try {
-      const bookmarkRef = doc(db, "users", user.uid, "bookmarks", story.id);
+      const bookmarkRef = doc(db, "students", user.uid, "bookmarks", story.id);
       const isBookmarked = bookmarkedStories.has(story.id);
       if (isBookmarked) {
         await deleteDoc(bookmarkRef);

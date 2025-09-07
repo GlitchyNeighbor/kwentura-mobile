@@ -59,7 +59,7 @@ const Library = ({ navigation }) => {
 
   const loadUserBookmarks = (userId) => {
     try {
-      const bookmarksRef = collection(db, "users", userId, "bookmarks");
+      const bookmarksRef = collection(db, "students", userId, "bookmarks");
       const q = query(bookmarksRef, orderBy("bookmarkedAt", "desc"));
 
       // Real-time listener for bookmarks
@@ -91,7 +91,7 @@ const Library = ({ navigation }) => {
 
   const loadUserProgress = (userId) => {
     try {
-      const progressRef = collection(db, "users", userId, "progress");
+      const progressRef = collection(db, "students", userId, "progress");
       const q = query(progressRef, orderBy("lastReadAt", "desc"));
 
       // Real-time listener for reading progress
@@ -161,7 +161,7 @@ const Library = ({ navigation }) => {
             try {
               const bookmarkRef = doc(
                 db,
-                "users",
+                "students",
                 user.uid,
                 "bookmarks",
                 story.id
@@ -202,7 +202,7 @@ const Library = ({ navigation }) => {
             try {
               const progressRef = doc(
                 db,
-                "users",
+                "students",
                 user.uid,
                 "progress",
                 story.id

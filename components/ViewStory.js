@@ -115,7 +115,7 @@ const ViewStory = ({ navigation, route }) => {
       if (user && currentStory?.id) {
         const bookmarkRef = doc(
           db,
-          "users",
+          "students",
           user.uid,
           "bookmarks",
           currentStory.id
@@ -158,7 +158,7 @@ const ViewStory = ({ navigation, route }) => {
 
     const bookmarkRef = doc(
       db,
-      "users",
+      "students",
       user.uid,
       "bookmarks",
       currentStory.id

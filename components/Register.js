@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import {
   TextInput,
   View,
@@ -13,9 +13,13 @@ import {
   KeyboardAvoidingView,
   Platform,
   ImageBackground,
-
 } from "react-native";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import {
+  createUserWithEmailAndPassword,
+  sendEmailVerification,
+  deleteUser,
+  updatePassword,
+} from "firebase/auth";
 import {
   collection,
   query,
@@ -23,12 +27,12 @@ import {
   getDocs,
   setDoc,
   doc,
-  getDoc,
   serverTimestamp,
 } from "firebase/firestore";
-import { auth, db } from "../FirebaseConfig";
+import { auth, db } from "../FirebaseConfig"; // Corrected import
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { Checkbox } from "react-native-paper";
+import { useAuthFlow } from "../context/AuthFlowContext";
 
 const getFirebaseAuthErrorMessage = (code) => {
   switch (code) {
@@ -57,6 +61,21 @@ const Register = ({ navigation }) => {
   const [isSigningUp, setIsSigningUp] = useState(false);
   const [termsAgreed, setTermsAgreed] = useState(false);
   const [passwordError, setPasswordError] = useState("");
+  const [isEmailVerified, setIsEmailVerified] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [isCodeSent, setIsCodeSent] = useState(false); // New state for disabling button
+  const { setIsVerifyingEmail, setRegistrationCompleted } = useAuthFlow();
+  
+  // Effect to check if a user is already signed in (e.g. from a previous attempt)
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged(user => {
+      if (user && user.emailVerified) {
+        setEmail(user.email);
+        setIsEmailVerified(true);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   const validatePassword = (pwd) => {
     if (pwd.length < 6) {
@@ -74,91 +93,166 @@ const Register = ({ navigation }) => {
     return ""; // No error
   };
 
+
+
   const signUp = async () => {
-    if (
-      !firstName ||
-      !lastName ||
-      !email ||
-      !contactNumber ||
-      !password ||
-      !confirmPassword
-    ) {
-      Alert.alert("Missing Information", "Please fill in all fields.");
-      return;
+    if (!firstName || !lastName || !email || !contactNumber || !password || !confirmPassword) {
+    Alert.alert("Missing Information", "Please fill in all fields.");
+    return;
     }
     if (contactNumber.length !== 11 || !/^\d+$/.test(contactNumber)) {
-      Alert.alert(
-        "Invalid Contact Number",
-        "Please enter a valid 11-digit contact number."
-      );
-      return;
+    Alert.alert("Invalid Contact Number", "Please enter a valid 11-digit contact number.");
+    return;
     }
     if (passwordError) {
-      Alert.alert("Weak Password", passwordError);
-      return;
+    Alert.alert("Weak Password", passwordError);
+    return;
     }
     if (password !== confirmPassword) {
-      Alert.alert("Password Mismatch", "Passwords do not match!");
-      return;
+    Alert.alert("Password Mismatch", "Passwords do not match!");
+    return;
     }
+
 
     if (isSigningUp) return;
     setIsSigningUp(true);
 
-    try {
-      const studentsRef = collection(db, "students");
-      const q = query(studentsRef, where("email", "==", email));
-      const querySnapshot = await getDocs(q);
 
-      if (!querySnapshot.empty) {
-        Alert.alert(
-          "Email Exists",
-          "This email address is already registered."
-        );
-        setIsSigningUp(false);
+    try {
+    const studentsRef = collection(db, "students");
+    const q = query(studentsRef, where("email", "==", email));
+    const querySnapshot = await getDocs(q);
+
+
+    if (!querySnapshot.empty) {
+    Alert.alert("Email Exists", "This email address is already registered.");
+    setIsSigningUp(false);
+    return;
+    }
+
+
+    let user = auth.currentUser;
+    if (!user || user.email.toLowerCase() !== email.trim().toLowerCase()) {
+    Alert.alert("Verification Error", "The verified email does not match. Please start over.");
+    setIsSigningUp(false);
+    return;
+    }
+
+
+    await updatePassword(user, password);
+
+
+    await setDoc(doc(db, "students", user.uid), {
+    parentFirstName: firstName,
+    parentLastName: lastName,
+    parentContactNumber: contactNumber,
+    email: user.email,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    studentFirstName: null,
+    studentLastName: null,
+    schoolId: null,
+    gradeLevel: null,
+    section: null,
+    role: "student",
+    status: "pending_approval",
+    approvedBy: null,
+    activeSessionId: null,
+    isArchived: false,
+    });
+
+
+    setIsSigningUp(false);
+    setRegistrationCompleted(true);
+
+
+    if (auth.currentUser) {
+    navigation.replace("StudDetails", { userId: auth.currentUser.uid });
+    }
+    } catch (error) {
+    setIsSigningUp(false);
+    if (error.code === "auth/email-already-in-use") {
+    Alert.alert("Email Exists", "This email is already registered. Please log in or use 'Forgot Password'.", [{ text: "OK" }]);
+    } else if (error.code === "auth/requires-recent-login") {
+    Alert.alert("Session Expired", "For security, please send the verification code again before continuing.");
+    } else {
+    console.error("Registration error:", error);
+    Alert.alert("Sign Up Failed", getFirebaseAuthErrorMessage(error.code));
+    }
+    }
+  };
+
+const handleVerifyEmail = async () => {
+  if (!email.trim()) {
+    Alert.alert("Invalid Email", "Please enter an email first.");
+    return;
+  }
+  setIsVerifying(true);
+  setIsCodeSent(true); // Disable the button immediately
+  setIsVerifyingEmail(true); // Signal to RootNavigator to ignore the next auth change
+  try {
+    // Check if a user is already logged in (e.g., from a previous failed attempt)
+    if (auth.currentUser) {
+      // If the email is different, sign out the old user
+      if (auth.currentUser.email.toLowerCase() !== email.trim().toLowerCase()) {
+        await auth.signOut();
+      } else if (auth.currentUser.emailVerified) {
+        // If it's the same user and they are already verified
+        setIsEmailVerified(true);
+        Alert.alert("Already Verified", "Your email is already verified. You can now continue.");
+        setIsVerifyingEmail(false); // Reset the flag
+        setIsVerifying(false);
         return;
       }
-
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        email,
-        password
-      );
-      const user = userCredential.user;
-
-      await setDoc(doc(db, "students", user.uid), {
-        parentFirstName: firstName, // Use parentFirstName
-        parentLastName: lastName, // Use parentLastName
-        parentContactNumber: contactNumber, // Use parentContactNumber
-        email: user.email,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        studentFirstName: null,
-        studentLastName: null,
-        schoolId: null,
-        gradeLevel: null,
-        section: null,
-        role: "student",
-        status: "pending_approval", // Added: Initial status for teacher approval
-        approvedBy: null, // Added: No approver initially
-        activeSessionId: null, // Added: activeSessionId
-        isArchived: false, // Added: isArchived
-      });
-    } catch (error) {
-      if (error.code === "auth/email-already-in-use") {
-        Alert.alert(
-          "Email Exists",
-          "This email is already registered. Please log in or use 'Forgot Password'.",
-          [{ text: "OK" }]
-        );
-        // Stay on the same screen
-      } else {
-        console.error("Registration error:", error);
-        Alert.alert("Sign Up Failed", getFirebaseAuthErrorMessage(error.code));
-      }
-    } finally {
-      setIsSigningUp(false);
     }
+
+    // Create a temporary user with a secure, random password to send the verification email
+    const tempPassword = Math.random().toString(36).slice(-8) + "A1!";
+    const tempUser = await createUserWithEmailAndPassword(auth, email.trim(), tempPassword);
+    await sendEmailVerification(tempUser.user);
+
+    Alert.alert(
+      "Verification Sent",
+      `A verification link has been sent to ${email.trim()}. Please check your email (and spam folder), then return here and press "Check Verification".`
+    );
+  } catch (err) {
+    console.error("Email verification error:", err);
+    Alert.alert("Error", getFirebaseAuthErrorMessage(err.code));
+    setIsCodeSent(false); // Re-enable button on error
+  } finally {
+    setIsVerifying(false);
+    setIsVerifyingEmail(false); // IMPORTANT: Always reset the flag
+  }
+};
+
+const checkIfVerified = async () => {
+  const user = auth.currentUser;
+  if (!user) {
+    Alert.alert("Verification Error", "Please send the verification email first.");
+    return;
+  }
+  await user.reload();
+  if (user.emailVerified) {
+    setIsEmailVerified(true);
+    Alert.alert("Success!", "Your email has been verified. You can now fill out the rest of the form and continue.");
+  } else {
+    Alert.alert("Not Verified Yet", "Please click the link in the email we sent you, then try again.");
+  }
+};
+
+  const handleCancel = async () => {
+    const user = auth.currentUser;
+    // Only delete if there's a temporary, unverified user.
+    if (user && !user.emailVerified) {
+      try {
+        await deleteUser(user);
+        console.log("Temporary user deleted on cancel.");
+      } catch (error) {
+        console.error("Failed to delete temporary user on cancel:", error);
+        // Don't block navigation, but the user might need to sign out manually if they come back.
+      }
+    }
+    navigation.goBack();
   };
 
   return (
@@ -220,16 +314,38 @@ const Register = ({ navigation }) => {
             autoCapitalize="words"
           />
           <TextInput
-            style={styles.input}
-            placeholder="Email" // Changed from "Parent's email"
+            style={styles.emailInput}
+            placeholder="Email"
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
             autoCapitalize="none"
           />
+          <View style={styles.verificationRow}>
+            <TouchableOpacity
+              style={[styles.verifyButton, (isVerifying || isEmailVerified || isCodeSent) && styles.disabledButton]}
+              onPress={handleVerifyEmail}
+              disabled={isVerifying || isEmailVerified || isCodeSent}
+            >
+              {isVerifying ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.verifyButtonText}>{isCodeSent ? "Code Sent" : "Send Code"}</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.checkVerifyButton, isEmailVerified && styles.disabledButton]}
+              onPress={checkIfVerified}
+              disabled={isEmailVerified}
+            >
+              <Text style={styles.verifyButtonText}>
+                {isEmailVerified ? "Verified" : "Check Verification"}
+              </Text>
+            </TouchableOpacity>
+          </View>
           <TextInput
             style={styles.input}
-            placeholder="Parent's contact number (11 digits)"
+            placeholder="Parent's contact number"
             value={contactNumber}
             onChangeText={setContactNumber}
             keyboardType="phone-pad"
@@ -308,7 +424,7 @@ const Register = ({ navigation }) => {
                 styles.cancelButton,
                 isSigningUp && styles.disabledButton,
               ]}
-              onPress={() => navigation.navigate("Login")}
+              onPress={handleCancel}
               disabled={isSigningUp}
             >
               <Text style={styles.cancelButtonText}>Cancel</Text>
@@ -316,11 +432,11 @@ const Register = ({ navigation }) => {
             <TouchableOpacity
               style={[
                 styles.continueButton,
-                (!termsAgreed || isSigningUp) && styles.disabledButton,
+                (!termsAgreed || !isEmailVerified || isSigningUp) && styles.disabledButton,
               ]}
               onPress={signUp}
-              disabled={!termsAgreed || isSigningUp}
-            >
+              disabled={!termsAgreed || !isEmailVerified || isSigningUp}
+              >
               {isSigningUp ? (
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
@@ -634,6 +750,49 @@ const styles = StyleSheet.create({
     width: "90%",
     textAlign: "left",
   },
+verificationRow: {
+  flexDirection: "row",
+  alignItems: "center",
+  width: "90%",
+  marginBottom: 10,
+  justifyContent: 'space-between',
+},
+emailInput: {
+  borderWidth: 1,
+  borderColor: "#929292ff",
+  borderRadius: 15,
+  paddingHorizontal: 15,
+  backgroundColor: "#fff",
+  height: 50,
+  width: '90%',
+  marginBottom: 10,
+},
+verifyButton: {
+  flex: 1,
+  marginRight: 5,
+  backgroundColor: "#FFCF2D",
+  borderRadius: 15,
+  paddingHorizontal: 15,
+  height: 50,
+  justifyContent: "center",
+  alignItems: "center",
+},
+checkVerifyButton: {
+  flex: 1,
+  marginLeft: 5,
+  backgroundColor: "#4CAF50", // A different color to distinguish
+  borderRadius: 15,
+  paddingHorizontal: 15,
+  height: 50,
+  justifyContent: "center",
+  alignItems: "center",
+},
+verifyButtonText: {
+  color: "#fff",
+  fontWeight: "bold",
+  fontSize: 14,
+},
+
 });
 
 export default Register;

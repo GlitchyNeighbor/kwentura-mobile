@@ -20,7 +20,7 @@ const { width, height } = Dimensions.get('window');
 const CONTACT_INFO = {
   email: "lopenafv@students.nu-moa.edu.ph",
   phone: "+63-XXX-XXX-XXXX", // Add actual phone number
-  website: "https://kwentura.edu.ph", // Add actual website
+  website: "https://kwentura-39597.web.app/contact", // Add actual website
 };
 
 const SYSTEM_FEATURES = [
@@ -83,18 +83,12 @@ const About = ({ navigation }) => {
           return;
       }
 
-      const canOpen = await Linking.canOpenURL(url);
-      if (canOpen) {
-        await Linking.openURL(url);
-      } else {
-        Alert.alert(
-          "Error",
-          `Cannot open ${type}. Please try again or contact us through another method.`
-        );
-      }
+      // Directly attempt to open the URL. `canOpenURL` is unreliable for mailto on Android.
+      // The catch block will handle cases where no email client is available.
+      await Linking.openURL(url);
     } catch (error) {
       console.error(`Error opening ${type}:`, error);
-      Alert.alert("Error", `Failed to open ${type}. Please try again.`);
+      Alert.alert("Unable to Open", `Could not open the ${type} client. Please ensure one is installed and configured on your device.`);
     }
   }, []);
 

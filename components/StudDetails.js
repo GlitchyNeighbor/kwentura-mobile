@@ -107,11 +107,8 @@ const StudDetails = ({ navigation, route }) => {
         },
         { merge: true }
       );
-      Alert.alert(
-        "Registration Successful",
-        "Your account has been created and is now pending approval from your section adviser. Please wait for confirmation before logging in.",
-        [{ text: "OK", onPress: () => firebaseSignOut(auth) }]
-      );
+      navigation.navigate("RegisterComplete");
+      firebaseSignOut(auth);
     } catch (error) {
       console.error("Failed to save student details:", error);
       Alert.alert(
@@ -143,10 +140,11 @@ const StudDetails = ({ navigation, route }) => {
               // Delete the user from Firebase Authentication
               const user = auth.currentUser;
               if (user) {
-                await deleteUser(auth.currentUser);
-                await firebaseSignOut(auth);
+                // Deleting the user from Auth also signs them out automatically.
+                await deleteUser(user);
               }
-              navigation.navigate("Register");
+              // Route the user back to the Landing page after cancellation.
+              navigation.navigate("Landing");
 
             } catch (error) {
               console.error("Error during cancellation:", error);
