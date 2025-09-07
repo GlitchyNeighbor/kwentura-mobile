@@ -520,12 +520,14 @@ const ReadStory = ({ route, navigation }) => {
     }
   };
 
-  const goToNextPage = () => {
+  const goToNextPage = async () => {
     if (!isScrollingRef.current) {
       isScrollingRef.current = true;
       
       if (currentAudio) {
-        currentAudio.unloadAsync();
+        try {
+          await currentAudio.unloadAsync();
+        } catch (e) { /* ignore */ }
         setCurrentAudio(null);
       }
       
@@ -606,12 +608,13 @@ const ReadStory = ({ route, navigation }) => {
         <View style={styles.completionButtons}>
           <TouchableOpacity
             style={[styles.completionButton, styles.readAgainButton]}
-            onPress={() => {
+            onPress={async () => {
               if (currentAudio) {
-                currentAudio.unloadAsync();
+                await currentAudio.unloadAsync();
                 setCurrentAudio(null);
               }
-              navigation.navigate('ComQuestions', { storyId: storyId, storyTitle: storyTitle });
+              await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+              navigation.navigate('ComQuestions', { storyId, storyTitle });
             }}
             activeOpacity={0.8}
           >
@@ -676,170 +679,172 @@ const ReadStory = ({ route, navigation }) => {
   }
 
   return (
-    <ImageBackground
-      source={require('../images/DarkViewStory.png')}
-      style={styles.background}
-      resizeMode="cover"
-    >    
-    {!isLandscape && (
-      <AppHeader
-        navigation={navigation}
-        leftIconType="drawer"
-        availableLanguages={availableLanguages}
-        currentLanguage={currentLanguage}
-        onLanguageToggle={handleLanguageToggle}
-      />  
-    )}
+    <View style={{ flex: 1 }}>
+      <ImageBackground
+        source={require('../images/DarkViewStory.png')}
+        style={styles.background}
+        resizeMode="cover"
+      >    
+        {!isLandscape && (
+          <AppHeader
+            navigation={navigation}
+            leftIconType="drawer"
+            availableLanguages={availableLanguages}
+            currentLanguage={currentLanguage}
+            onLanguageToggle={handleLanguageToggle}
+          />  
+        )}
 
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <SafeAreaView style={styles.safeArea}>
-          <TouchableWithoutFeedback onPress={() => setShowUI(true)}>
-            <View style={{ flex: 1 }}>
-           <View style={isLandscape ? styles.landscapeContainer : styles.container}>
-            {pageImages.length > 0 ? (
-              <>
-                {!isLandscape && (
-                  <Animated.View style={[styles.storyHeader, uiAnimatedStyle]}>
-                    {storyTitle ? (
-                      <Text style={styles.storyTitle}>{storyTitle}</Text>
-                    ) : null}
-                    {storyAuthor ? (
-                      <Text style={styles.storyAuthor}>by {storyAuthor}</Text>
-                    ) : null}
-                  </Animated.View>
-                )}
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <SafeAreaView style={styles.safeArea}>
+            <TouchableWithoutFeedback onPress={() => setShowUI(true)}>
+              <View style={{ flex: 1 }}>
+                <View style={isLandscape ? styles.landscapeContainer : styles.container}>
+                  {pageImages.length > 0 ? (
+                    <>
+                      {!isLandscape && (
+                        <Animated.View style={[styles.storyHeader, uiAnimatedStyle]}>
+                          {storyTitle ? (
+                            <Text style={styles.storyTitle}>{storyTitle}</Text>
+                          ) : null}
+                          {storyAuthor ? (
+                            <Text style={styles.storyAuthor}>by {storyAuthor}</Text>
+                          ) : null}
+                        </Animated.View>
+                      )}
 
-                {showCompletion && <CompletionScreen />}
-                
-                {!isLandscape && (
-                  <>
-                    <Animated.Text style={[styles.decorativeSparkle, styles.bottomLeft, sparkleAnimatedStyle]}>⭐</Animated.Text>
-                    <Animated.Text style={[styles.decorativeSparkle, styles.bottomRight, sparkleAnimatedStyle]}>✨</Animated.Text>
-                  </>
-                )}
+                      {!isLandscape && (
+                        <>
+                          <Animated.Text style={[styles.decorativeSparkle, styles.bottomLeft, sparkleAnimatedStyle]}>⭐</Animated.Text>
+                          <Animated.Text style={[styles.decorativeSparkle, styles.bottomRight, sparkleAnimatedStyle]}>✨</Animated.Text>
+                        </>
+                      )}
 
-                <View style={isLandscape ? styles.landscapeStoryContent : styles.storyContent}>
-                  <FlatList
-                    ref={flatListRef}
-                    data={pageImages}
-                    renderItem={renderPage}
-                    keyExtractor={(item, index) => `${index}-${isLandscape ? 'landscape' : 'portrait'}`}
-                    horizontal
-                    pagingEnabled
-                    showsHorizontalScrollIndicator={false}
-                    onViewableItemsChanged={onViewableItemsChanged}
-                    viewabilityConfig={viewabilityConfig}
-                    onScrollToIndexFailed={onScrollToIndexFailed}
-                    onScrollBeginDrag={onScrollBeginDrag}
-                    onMomentumScrollEnd={onMomentumScrollEnd}
-                    removeClippedSubviews={false}
-                    initialScrollIndex={initialPage}
-                    getItemLayout={(data, index) => ({
-                      length: isLandscape ? height : width,
-                      offset: (isLandscape ? height : width) * index,
-                      index,
-                    })}
-                  />
+                      <View style={isLandscape ? styles.landscapeStoryContent : styles.storyContent}>
+                        <FlatList
+                          ref={flatListRef}
+                          data={pageImages}
+                          renderItem={renderPage}
+                          keyExtractor={(item, index) => `${index}-${isLandscape ? 'landscape' : 'portrait'}`}
+                          horizontal
+                          pagingEnabled
+                          showsHorizontalScrollIndicator={false}
+                          onViewableItemsChanged={onViewableItemsChanged}
+                          viewabilityConfig={viewabilityConfig}
+                          onScrollToIndexFailed={onScrollToIndexFailed}
+                          onScrollBeginDrag={onScrollBeginDrag}
+                          onMomentumScrollEnd={onMomentumScrollEnd}
+                          removeClippedSubviews={false}
+                          initialScrollIndex={initialPage}
+                          getItemLayout={(data, index) => ({
+                            length: isLandscape ? height : width,
+                            offset: (isLandscape ? height : width) * index,
+                            index,
+                          })}
+                        />
+                      </View>
+
+                      <Animated.View style={[
+                        isLandscape ? styles.landscapeActionButtons : styles.actionButtons, 
+                        uiAnimatedStyle
+                      ]}>
+                        <TouchableOpacity
+                          style={styles.listenButton}
+                          onPress={handleSpeak}
+                          activeOpacity={0.8}
+                          disabled={isLoadingAudio}
+                        >
+                          <Animated.View style={[styles.listenButtonContent, speakerAnimatedStyle]}>
+                            <Text style={styles.listenButtonEmoji}>
+                              {isLoadingAudio ? "⌛" : isPlaying ? "🔊" : "🎧"}
+                            </Text>
+                            <Text style={styles.listenButtonText}>
+                              {isLoadingAudio ? "Loading..." : isPlaying ? "Stop" : "Listen"}
+                            </Text>
+                          </Animated.View>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={styles.landscapeButton}
+                          onPress={toggleOrientation}
+                          activeOpacity={0.8}
+                        >
+                          <View style={styles.landscapeButtonContent}>
+                            <Text style={styles.landscapeButtonEmoji}>
+                              {isLandscape ? "📱" : "🔄"}
+                            </Text>
+                            <Text style={styles.landscapeButtonText}>
+                              {isLandscape ? "Portrait" : "Landscape"}
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+                      </Animated.View>
+
+                      <Animated.View style={[
+                        isLandscape ? styles.landscapeControls : styles.controls, 
+                        uiAnimatedStyle
+                      ]}>
+                        <TouchableOpacity
+                          style={[styles.navButton, (currentPage === 0 || isScrollingRef.current) && styles.disabledButton]}
+                          onPress={goToPreviousPage}
+                          disabled={currentPage === 0 || isScrollingRef.current}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={styles.navButtonText}>{"⬅️ Back"}</Text>
+                        </TouchableOpacity>
+                        
+                        <View style={styles.pageIndicatorContainer}>
+                          <Text style={styles.pageIndicator}>
+                             Page {currentPage + 1} of {pageImages.length}
+                          </Text>
+                          <View style={styles.progressBar}>
+                            <View 
+                              style={[
+                                styles.progressFill, 
+                                { width: `${((currentPage + 1) / pageImages.length) * 100}%` }
+                              ]} 
+                            />
+                          </View>
+                        </View>
+                        
+                        <TouchableOpacity
+                          style={[
+                            styles.navButton, 
+                            currentPage === pageImages.length - 1 && styles.lastPageButton,
+                            isScrollingRef.current && styles.disabledButton
+                          ]}
+                          onPress={goToNextPage}
+                          disabled={isScrollingRef.current}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={styles.navButtonText}>
+                            {currentPage === pageImages.length - 1 ? "🎉 Finish" : "Next ➡️"}
+                          </Text>
+                        </TouchableOpacity>
+                      </Animated.View>
+                    </>
+                  ) : (
+                    <View style={styles.centered}>
+                      <Text style={styles.errorTitle}>📚 Oops!</Text>
+                      <Text style={styles.errorText}>{error || "No pages found for this story."}</Text>
+                      <Text style={styles.subText}>Let's try again or pick a different story!</Text>
+                      <TouchableOpacity 
+                        style={styles.retryButton}
+                        onPress={() => navigation.goBack()}
+                      >
+                        <Text style={styles.retryButtonText}>🌟 Choose Another Story</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </View>
-
-                <Animated.View style={[
-                  isLandscape ? styles.landscapeActionButtons : styles.actionButtons, 
-                  uiAnimatedStyle
-                ]}>
-                  <TouchableOpacity
-                    style={styles.listenButton}
-                    onPress={handleSpeak}
-                    activeOpacity={0.8}
-                    disabled={isLoadingAudio}
-                  >
-                    <Animated.View style={[styles.listenButtonContent, speakerAnimatedStyle]}>
-                      <Text style={styles.listenButtonEmoji}>
-                        {isLoadingAudio ? "⌛" : isPlaying ? "🔊" : "🎧"}
-                      </Text>
-                      <Text style={styles.listenButtonText}>
-                        {isLoadingAudio ? "Loading..." : isPlaying ? "Stop" : "Listen"}
-                      </Text>
-                    </Animated.View>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.landscapeButton}
-                    onPress={toggleOrientation}
-                    activeOpacity={0.8}
-                  >
-                    <View style={styles.landscapeButtonContent}>
-                      <Text style={styles.landscapeButtonEmoji}>
-                        {isLandscape ? "📱" : "🔄"}
-                      </Text>
-                      <Text style={styles.landscapeButtonText}>
-                        {isLandscape ? "Portrait" : "Landscape"}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                </Animated.View>
-
-                <Animated.View style={[
-                  isLandscape ? styles.landscapeControls : styles.controls, 
-                  uiAnimatedStyle
-                ]}>
-                  <TouchableOpacity
-                    style={[styles.navButton, (currentPage === 0 || isScrollingRef.current) && styles.disabledButton]}
-                    onPress={goToPreviousPage}
-                    disabled={currentPage === 0 || isScrollingRef.current}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.navButtonText}>{"⬅️ Back"}</Text>
-                  </TouchableOpacity>
-                  
-                  <View style={styles.pageIndicatorContainer}>
-                    <Text style={styles.pageIndicator}>
-                       Page {currentPage + 1} of {pageImages.length}
-                    </Text>
-                    <View style={styles.progressBar}>
-                      <View 
-                        style={[
-                          styles.progressFill, 
-                          { width: `${((currentPage + 1) / pageImages.length) * 100}%` }
-                        ]} 
-                      />
-                    </View>
-                  </View>
-                  
-                  <TouchableOpacity
-                    style={[
-                      styles.navButton, 
-                      currentPage === pageImages.length - 1 && styles.lastPageButton,
-                      isScrollingRef.current && styles.disabledButton
-                    ]}
-                    onPress={goToNextPage}
-                    disabled={isScrollingRef.current}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.navButtonText}>
-                      {currentPage === pageImages.length - 1 ? "🎉 Finish" : "Next ➡️"}
-                    </Text>
-                  </TouchableOpacity>
-                </Animated.View>
-              </>
-            ) : (
-              <View style={styles.centered}>
-                <Text style={styles.errorTitle}>📚 Oops!</Text>
-                <Text style={styles.errorText}>{error || "No pages found for this story."}</Text>
-                <Text style={styles.subText}>Let's try again or pick a different story!</Text>
-                <TouchableOpacity 
-                  style={styles.retryButton}
-                  onPress={() => navigation.goBack()}
-                >
-                  <Text style={styles.retryButtonText}>🌟 Choose Another Story</Text>
-                </TouchableOpacity>
               </View>
-            )}
-          </View>
-            </View>
-          </TouchableWithoutFeedback>
-        </SafeAreaView>
-      </GestureHandlerRootView>
-    </ImageBackground>
+            </TouchableWithoutFeedback>
+          </SafeAreaView>
+        </GestureHandlerRootView>
+      </ImageBackground>
+      
+      {showCompletion && <CompletionScreen />}
+    </View>
   );
 };
 
@@ -1074,30 +1079,27 @@ const styles = StyleSheet.create({
   },
   actionButtons: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'space-around', // Distribute space evenly
     alignItems: 'center',
     position: 'absolute',
     bottom: 70,
     left: 0,
     right: 0,
     zIndex: 10,
-    gap: 5,
     marginLeft: 10,
     marginRight: 10,
   },
   landscapeActionButtons: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'space-around', // Distribute space evenly
     alignItems: 'center',
     position: 'absolute',
     bottom: 60,
     left: 0,
     right: 0,
     zIndex: 10,
-    gap: 500,
     marginBottom: 20,
-    marginLeft: 10,
-    marginRight: 10,
+    gap: 450
   },
   listenButton: {
     backgroundColor: '#FF6B6B',
@@ -1108,10 +1110,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.3,
     shadowRadius: 5,
-    elevation: 8,
     borderWidth: 3,
     borderColor: 'white',
-    flex: 1,
+    flex: 0.45, // Use flex to control width instead of fixed values
     marginBottom: 10,
     
   },
@@ -1124,11 +1125,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.3,
     shadowRadius: 5,
-    elevation: 8,
     borderWidth: 3,
     borderColor: 'white',
-    flex: 1,
-    marginLeft: 20,
+    flex: 0.45, // Use flex to control width instead of fixed values
     marginBottom: 10,
 
     
@@ -1143,10 +1142,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    
   },
   listenButtonEmoji: {
     fontSize: 18,
     marginRight: 10,
+    
   },
   landscapeButtonEmoji: {
     fontSize: 18,
@@ -1173,6 +1174,7 @@ const styles = StyleSheet.create({
     left: 10,
     right: 10,
     zIndex: 10,
+    
   },
   landscapeControls: {
     flexDirection: "row",
@@ -1185,6 +1187,7 @@ const styles = StyleSheet.create({
     left: 10,
     right: 10,
     zIndex: 10,
+    
   },
   navButton: {
     backgroundColor: '#4ECDC4',
@@ -1197,7 +1200,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 3,
-    elevation: 5,
   },
   disabledButton: {
     backgroundColor: '#CCCCCC',

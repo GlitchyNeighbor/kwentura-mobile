@@ -791,6 +791,7 @@ verifyButtonText: {
   color: "#fff",
   fontWeight: "bold",
   fontSize: 14,
+  textAlign: 'center',
 },
 
 });

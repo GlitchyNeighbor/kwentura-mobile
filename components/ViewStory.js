@@ -294,13 +294,14 @@ const ViewStory = ({ navigation, route }) => {
       resizeMode="cover"
     >   
       <SafeAreaView style={styles.container}>
-        <Header navigation={navigation} />
+        
 
         <ScrollView 
           style={styles.scrollViewContainer}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContentContainer}
         >
+        <Header navigation={navigation} />
           <Animated.View 
             style={[
               styles.contentContainer,
@@ -419,9 +420,12 @@ const styles = StyleSheet.create({
   scrollContentContainer: {
     flexGrow: 1,
     paddingBottom: 20,
+  
   },
   contentContainer: {
     paddingHorizontal: 20,
+    alignItems: 'center', // Center children horizontally
+    
   },
   titleText: {
     fontSize: 28,
@@ -439,6 +443,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 15,
     marginBottom: 20,
+    width: '100%', // Ensure card takes full width of its container
     flexDirection: "row",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
@@ -584,6 +589,7 @@ const styles = StyleSheet.create({
     padding: 20,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
+    width: '100%', // Ensure card takes full width of its container
     shadowOpacity: 0.15,
     shadowRadius: 12,
     elevation: 8,

@@ -12,7 +12,8 @@ import {
   StatusBar,
   Alert,
   ImageBackground,
-  Modal
+  Modal,
+  TouchableWithoutFeedback, Animated
 } from "react-native";
 import React, { useState, useEffect, useRef } from "react";
 import { useRoute } from '@react-navigation/native';
@@ -36,6 +37,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Speech from 'expo-speech';
+import { Audio } from 'expo-av';
 
 const { width, height } = Dimensions.get("window");
 
@@ -69,6 +71,20 @@ const Rewards = ({ navigation }) => {
   const [unlockedModalVisible, setUnlockedModalVisible] = useState(false);
   const [unlockedReward, setUnlockedReward] = useState(null);
   const searchTimeoutRef = useRef(null);
+  const [boinkSound, setBoinkSound] = useState();
+  const unlockedAvatarScale = useRef(new Animated.Value(1)).current;
+
+  // Create animated values for each reward for bounce animation
+  const animatedValues = useRef({});
+  
+  // Initialize animated values for all rewards
+  useEffect(() => {
+    rewardsConfig.forEach(reward => {
+      if (!animatedValues.current[reward.id]) {
+        animatedValues.current[reward.id] = new Animated.Value(1);
+      }
+    });
+  }, []);
 
   // Keys for AsyncStorage
   const RECENT_SEARCHES_KEY = "@recent_searches";
@@ -110,6 +126,24 @@ const Rewards = ({ navigation }) => {
     return () => {
       Speech.stop();
     };
+  }, []);
+
+  // Load and unload the boink sound for the unlocked modal
+  useEffect(() => {
+    const loadSound = async () => {
+      try {
+        const { sound } = await Audio.Sound.createAsync(
+           require('../assets/sounds/boink.mp3')
+        );
+        setBoinkSound(sound);
+      } catch (error) {
+        console.error('Failed to load the boink sound', error);
+      }
+    };
+
+    loadSound();
+
+    return () => boinkSound?.unloadAsync();
   }, []);
 
   // Effect to handle stars earned from quiz - REMOVED
@@ -630,11 +664,42 @@ const Rewards = ({ navigation }) => {
     setFilteredStories(stories);
   };
 
+  // Function to handle unlocked animal clicks with bounce animation and sound
+  const handleUnlockedAnimalClick = async (rewardId) => {
+    const animatedValue = animatedValues.current[rewardId];
+    
+    // Play the sound if it's loaded
+    if (boinkSound) {
+      await boinkSound.replayAsync();
+    }
+    
+    // Create bounce animation
+    Animated.sequence([
+      Animated.timing(animatedValue, {
+        toValue: 1.3,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+      Animated.timing(animatedValue, {
+        toValue: 0.9,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(animatedValue, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    
+    console.log(`Bounced unlocked animal ${rewardId} with boink sound!`);
+  };
   
 // Simple and clear renderAnimalReward function
 const renderAnimalReward = (reward, index) => {
   const isUnlocked = unlockedRewards.has(reward.id);
   const hasEnoughStars = userStars >= reward.starsRequired;
+  const animatedValue = animatedValues.current[reward.id] || new Animated.Value(1);
   
   // Simple logic:
   // - If already unlocked: show as unlocked
@@ -645,16 +710,13 @@ const renderAnimalReward = (reward, index) => {
   const isLocked = !isUnlocked && !hasEnoughStars;
 
   return (
-    <TouchableOpacity
+    <TouchableWithoutFeedback
       key={reward.id}
-      style={[
-        styles.animalRewardContainer,
-        isUnlocked && styles.animalRewardUnlocked,
-        canUnlock && styles.animalRewardCanUnlock,
-        isLocked && styles.animalRewardLocked,
-      ]}
       onPress={() => {
-        if (isLocked) {
+        if (isUnlocked) {
+          // If unlocked, play animation and sound
+          handleUnlockedAnimalClick(reward.id);
+        } else if (isLocked) {
           // Cannot unlock - show alert
           Alert.alert(
             "Not Enough Stars",
@@ -671,102 +733,113 @@ const renderAnimalReward = (reward, index) => {
           setPreviewVisible(true);
         }
       }}
-      activeOpacity={0.8}
     >
-      <View style={[
-        styles.animalCircle,
-        { 
-          backgroundColor: isUnlocked 
-            ? reward.bgColor 
-            : canUnlock
-            ? '#FFF8E1'  // Yellow for unlockable
-            : '#F0F0F0'  // Gray for locked
-        }
-      ]}>
-        <LinearGradient
-          colors={
-            isUnlocked
-              ? [reward.color, `${reward.color}DD`]
-              : canUnlock
-              ? ["#FFD700", "#FFA000"]  // Gold for unlockable
-              : ["#CCCCCC", "#999999"]  // Gray for locked
-          }
-          style={styles.animalCircleInner}
-        >
-          {isUnlocked ? (
-            // Already unlocked - show crown
-            <View style={styles.unlockedAnimalContainer}>
-              <Image 
-                source={reward.image}
-                style={styles.animalImage}
-                resizeMode="contain"
-              />
-              <View style={styles.crownContainer}>
-                <Text style={styles.crownEmoji}>👑</Text>
-              </View>
-            </View>
-          ) : canUnlock ? (
-            // Can unlock - show TAP with star
-            <View style={styles.canUnlockAnimalContainer}>
-              <Image 
-                source={reward.image}
-                style={styles.animalImage}
-                resizeMode="contain"
-              />
-              <View style={styles.unlockPulse}>
-                <Text style={styles.unlockStarIcon}>⭐</Text>
-              </View>
-              <Text style={styles.tapToUnlockText}>TAP</Text>
-            </View>
-          ) : (
-            // Locked - show lock icon
-            <View style={styles.lockedAnimalContainer}>
-              <Image 
-                source={reward.image}
-                style={[styles.animalImage, styles.animalImageLocked]}
-                resizeMode="contain"
-              />
-              <View style={styles.lockOverlay}>
-                <Ionicons name="lock-closed" size={16} color="#666" />
-              </View>
-            </View>
-          )}
-        </LinearGradient>
-      </View>
-      
-      <Text style={[
-        styles.animalRewardTitle,
-        isUnlocked && styles.animalRewardTitleUnlocked,
-        canUnlock && styles.animalRewardTitleCanUnlock,
-        isLocked && styles.animalRewardTitleLocked,
-      ]}>
-        {reward.title}
-      </Text>
-      
-      <Text style={[
-        styles.animalRewardDescription,
-        isUnlocked && styles.animalRewardDescriptionUnlocked,
-        isLocked && styles.animalRewardDescriptionLocked,
-      ]}>
-        {reward.description}
-      </Text>
-      
-      {!isUnlocked && (
+      <Animated.View
+        style={[
+          styles.animalRewardContainer,
+          isUnlocked && styles.animalRewardUnlocked,
+          canUnlock && styles.animalRewardCanUnlock,
+          isLocked && styles.animalRewardLocked,
+          {
+            transform: [{ scale: animatedValue }],
+          },
+        ]}
+      >
         <View style={[
-          styles.starsRequiredContainer,
-          canUnlock && styles.starsRequiredContainerCanUnlock,
-          isLocked && styles.starsRequiredContainerLocked,
+          styles.animalCircle,
+          { 
+            backgroundColor: isUnlocked 
+              ? reward.bgColor 
+              : canUnlock
+              ? '#FFF8E1'  // Yellow for unlockable
+              : '#F0F0F0'  // Gray for locked
+          }
         ]}>
-          <Text style={[
-            styles.starsNeededText,
-            canUnlock && styles.starsNeededTextCanUnlock,
-            isLocked && styles.starsNeededTextLocked,
-          ]}>
-            {reward.starsRequired} ⭐
-          </Text>
+          <LinearGradient
+            colors={
+              isUnlocked
+                ? [reward.color, `${reward.color}DD`]
+                : canUnlock
+                ? ["#FFD700", "#FFA000"]  // Gold for unlockable
+                : ["#CCCCCC", "#999999"]  // Gray for locked
+            }
+            style={styles.animalCircleInner}
+          >
+            {isUnlocked ? (
+              // Already unlocked - show crown
+              <View style={styles.unlockedAnimalContainer}>
+                <Image 
+                  source={reward.image}
+                  style={styles.animalImage}
+                  resizeMode="contain"
+                />
+                <View style={styles.crownContainer}>
+                  <Text style={styles.crownEmoji}>👑</Text>
+                </View>
+              </View>
+            ) : canUnlock ? (
+              // Can unlock - show TAP with star
+              <View style={styles.canUnlockAnimalContainer}>
+                <Image 
+                  source={reward.image}
+                  style={styles.animalImage}
+                  resizeMode="contain"
+                />
+                <View style={styles.unlockPulse}>
+                  <Text style={styles.unlockStarIcon}>⭐</Text>
+                </View>
+                <Text style={styles.tapToUnlockText}>TAP</Text>
+              </View>
+            ) : (
+              // Locked - show lock icon
+              <View style={styles.lockedAnimalContainer}>
+                <Image 
+                  source={reward.image}
+                  style={[styles.animalImage, styles.animalImageLocked]}
+                  resizeMode="contain"
+                />
+                <View style={styles.lockOverlay}>
+                  <Ionicons name="lock-closed" size={16} color="#666" />
+                </View>
+              </View>
+            )}
+          </LinearGradient>
         </View>
-      )}
-    </TouchableOpacity>
+        
+        <Text style={[
+          styles.animalRewardTitle,
+          isUnlocked && styles.animalRewardTitleUnlocked,
+          canUnlock && styles.animalRewardTitleCanUnlock,
+          isLocked && styles.animalRewardTitleLocked,
+        ]}>
+          {reward.title}
+        </Text>
+        
+        <Text style={[
+          styles.animalRewardDescription,
+          isUnlocked && styles.animalRewardDescriptionUnlocked,
+          isLocked && styles.animalRewardDescriptionLocked,
+        ]}>
+          {reward.description}
+        </Text>
+        
+        {!isUnlocked && (
+          <View style={[
+            styles.starsRequiredContainer,
+            canUnlock && styles.starsRequiredContainerCanUnlock,
+            isLocked && styles.starsRequiredContainerLocked,
+          ]}>
+            <Text style={[
+              styles.starsNeededText,
+              canUnlock && styles.starsNeededTextCanUnlock,
+              isLocked && styles.starsNeededTextLocked,
+            ]}>
+              {reward.starsRequired} ⭐
+            </Text>
+          </View>
+        )}
+      </Animated.View>
+    </TouchableWithoutFeedback>
   );
 };
 
@@ -790,6 +863,33 @@ const renderAnimalReward = (reward, index) => {
         </View>
       </View>
     );
+  };
+
+  // Handle unlocked animal avatar click with bounce animation and sound (for modal)
+  const handleModalUnlockedAvatarClick = async () => {
+    // Create bounce animation
+    Animated.sequence([
+      Animated.timing(unlockedAvatarScale, {
+        toValue: 1.3,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+      Animated.timing(unlockedAvatarScale, {
+        toValue: 0.9,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(unlockedAvatarScale, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Play the sound if it's loaded
+    if (boinkSound) {
+      await boinkSound.replayAsync();
+    }
   };
 
   // Demo function to add stars (for testing purposes)
@@ -995,35 +1095,37 @@ const renderAnimalReward = (reward, index) => {
               </View>
 
               {/* Animal Image Display */}
-              <View style={styles.unlockedImageWrapper}>
-                <View style={[
-                  styles.unlockedAnimalCircle,
-                  { backgroundColor: unlockedReward?.bgColor || "#fff" }
-                ]}>
-                  <LinearGradient
-                    colors={[unlockedReward?.color || "#FFD700", `${unlockedReward?.color || "#FFD700"}DD`]}
-                    style={styles.unlockedAnimalCircleInner}
-                  >
-                    <View style={styles.unlockedAnimalImageContainer}>
-                      <Image
-                        source={unlockedReward?.image}
-                        style={styles.unlockedAnimalImage}
-                        resizeMode="contain"
-                      />
-                      <View style={styles.unlockedCrownContainer}>
-                        <Text style={styles.unlockedCrownEmoji}>👑</Text>
-                      </View>
-                      {/* Sparkle effects
+              <TouchableWithoutFeedback onPress={handleModalUnlockedAvatarClick}>
+                <Animated.View style={[styles.unlockedImageWrapper, { transform: [{ scale: unlockedAvatarScale }] }]}>
+                  <View style={[
+                    styles.unlockedAnimalCircle,
+                    { backgroundColor: unlockedReward?.bgColor || "#fff" }
+                  ]}>
+                    <LinearGradient
+                      colors={[unlockedReward?.color || "#FFD700", `${unlockedReward?.color || "#FFD700"}DD`]}
+                      style={styles.unlockedAnimalCircleInner}
+                    >
+                      <View style={styles.unlockedAnimalImageContainer}>
+                        <Image
+                          source={unlockedReward?.image}
+                          style={styles.unlockedAnimalImage}
+                          resizeMode="contain"
+                        />
+                        <View style={styles.unlockedCrownContainer}>
+                          <Text style={styles.unlockedCrownEmoji}>👑</Text>
+                        </View>
+                        {/* Sparkle effects
                       <View style={styles.sparkleEffect}>
                         <Text style={[styles.sparkle, styles.sparkle1]}>✨</Text>
                         <Text style={[styles.sparkle, styles.sparkle2]}>⭐</Text>
                         <Text style={[styles.sparkle, styles.sparkle3]}>✨</Text>
                         <Text style={[styles.sparkle, styles.sparkle4]}>⭐</Text>
                       </View> */}
-                    </View>
-                  </LinearGradient>
-                </View>
-              </View>
+                      </View>
+                    </LinearGradient>
+                  </View>
+                </Animated.View>
+              </TouchableWithoutFeedback>
               
               {/* Animal Info */}
               <Text style={styles.unlockedAnimalName}>

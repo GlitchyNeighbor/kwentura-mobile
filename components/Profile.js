@@ -16,7 +16,9 @@ import {
   ImageBackground,
   AppState,
   Alert,
-  Dimensions
+  Dimensions,
+  TouchableWithoutFeedback,
+  Animated
 } from "react-native";
 import { auth, db } from "../FirebaseConfig";
 import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
@@ -26,6 +28,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import AppHeader from "./HeaderProfile";
 import { useProfile } from '../context/ProfileContext';
 import { getUnlockedAnimalAvatars } from "./rewardsConfig";
+import { Audio } from 'expo-av';
 
 const DAILY_USAGE_LIMIT_MS = 90 * 60 * 1000;
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -51,7 +54,8 @@ const useTimer = (userId) => {
     let seconds = totalSeconds % 60;
     const pad = (num) => String(num).padStart(2, '0');
     return hours > 0 ? `${pad(hours)}:${pad(minutes)}:${pad(seconds)}` : `${pad(minutes)}:${pad(seconds)}`;
-  }, []);
+});
+
 
   // Storage key generators
   const getSleepKey = useCallback((id) => `appSleepUntilNextDayTimestamp_${id}`, []);
@@ -346,9 +350,39 @@ const RestModeOverlay = ({ onRestart, formatTime }) => {
 
 const AvatarPicker = ({ visible, onClose, onSave, currentAvatar, avatarOptions, navigation }) => {
   const [selectedAvatar, setSelectedAvatar] = useState(null);
+  const [sound, setSound] = useState();
+
+  // Load the sound when the component mounts
+  useEffect(() => {
+    const loadSound = async () => {
+      console.log('Loading boink sound...');
+      try {
+        const { sound } = await Audio.Sound.createAsync(
+           require('../assets/sounds/boink.mp3')
+        );
+        setSound(sound);
+        console.log('Boink sound loaded successfully');
+      } catch (error) {
+        console.error('Failed to load the boink sound', error);
+      }
+    };
+
+    if (visible) {
+      loadSound();
+    }
+
+    // Unload the sound when the component unmounts or modal closes
+    return () => {
+      if (sound) {
+        console.log('Unloading boink sound...');
+        sound.unloadAsync();
+      }
+    };
+  }, [visible]);
 
   const handleSave = useCallback(async () => {
     if (!selectedAvatar) return;
+    
     const success = await onSave(selectedAvatar);
     if (success) {
       onClose();
@@ -367,29 +401,85 @@ const AvatarPicker = ({ visible, onClose, onSave, currentAvatar, avatarOptions, 
     navigation.navigate("Rewards");
   }, [onClose, navigation]);
 
-  const renderAvatarItem = useCallback(({ item }) => {
+  // Create animated values for each avatar option
+  const animatedValues = useRef(new Map()).current;
+
+  // Get or create animated value for an item
+  const getAnimatedValue = useCallback((item) => {
+    const key = typeof item === 'object' ? JSON.stringify(item) : item;
+    if (!animatedValues.has(key)) {
+      animatedValues.set(key, new Animated.Value(1));
+    }
+    return animatedValues.get(key);
+  }, [animatedValues]);
+
+  // Handle animal avatar click with bounce animation and sound
+  const handleAvatarClick = useCallback(async (item) => {
+    const bounceValue = getAnimatedValue(item);
+    
+    // Create bounce animation
+    Animated.sequence([
+      Animated.timing(bounceValue, {
+        toValue: 1.3,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+      Animated.timing(bounceValue, {
+        toValue: 0.9,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(bounceValue, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Play the sound if it's loaded
+    if (sound) {
+      try {
+        await sound.replayAsync(); // Replay the sound from the beginning
+        console.log('Played boink sound for avatar click');
+      } catch (error) {
+        console.error('Failed to play boink sound', error);
+      }
+    }
+    
+    // Set selected avatar
+    setSelectedAvatar(item);
+  }, [sound, getAnimatedValue]);
+
+  const renderAvatarItem = useCallback(({ item, index }) => {
     const isCurrentAvatar = currentAvatar === item;
     const isSelectedForChange = selectedAvatar === item;
+    const bounceValue = getAnimatedValue(item);
     
     return (
-      <TouchableOpacity
-        style={[
-          styles.avatarOption,
-          isSelectedForChange && styles.avatarOptionSelected,
-          isCurrentAvatar && styles.avatarOptionCurrent,
-        ]}
-        onPress={() => setSelectedAvatar(item)}
-        activeOpacity={0.7}
-      >
-        <Image source={item} style={styles.avatarOptionImage} />
-        {isCurrentAvatar && (
-          <View style={styles.currentAvatarIndicator}>
-           
-          </View>
-        )}
-      </TouchableOpacity>
+      <TouchableWithoutFeedback onPress={() => handleAvatarClick(item)}>
+        <Animated.View
+          style={[
+            styles.avatarOption,
+            isSelectedForChange && styles.avatarOptionSelected,
+            isCurrentAvatar && styles.avatarOptionCurrent,
+            {
+              transform: [{ scale: bounceValue }],
+            },
+          ]}
+        >
+          <Image source={item} style={styles.avatarOptionImage} />
+          {isCurrentAvatar && (
+            <View style={styles.currentAvatarIndicator}>
+             
+            </View>
+          )}
+        </Animated.View>
+      </TouchableWithoutFeedback>
     );
-  }, [selectedAvatar, currentAvatar]);
+  }, [selectedAvatar, currentAvatar, handleAvatarClick, getAnimatedValue]);
+
+  // Check if save button should be disabled
+  const isSaveDisabled = !selectedAvatar || selectedAvatar === currentAvatar;
 
   // Show empty state when no avatars are available
   if (!avatarOptions || avatarOptions.length === 0) {
@@ -453,9 +543,9 @@ const AvatarPicker = ({ visible, onClose, onSave, currentAvatar, avatarOptions, 
               style={[
                 styles.modalButton,
                 styles.saveButton,
-                !selectedAvatar && styles.disabledModalButton,
+                isSaveDisabled && styles.disabledModalButton,
               ]}
-              disabled={!selectedAvatar}
+              disabled={isSaveDisabled}
               onPress={handleSave}
               activeOpacity={0.8}
             >
@@ -1010,23 +1100,23 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   avatarOptionCurrent: {
-  borderColor: '#27e62e',
-  borderWidth: 4,
-  backgroundColor: 'rgba(39, 230, 46, 0.1)',
-},
-currentAvatarIndicator: {
-  position: 'absolute',
-  bottom: -2,
-  right: -2,
-  backgroundColor: '#fff',
-  borderRadius: 12,
-  padding: 1,
-  elevation: 3,
-  shadowColor: "#000",
-  shadowOffset: { width: 0, height: 1 },
-  shadowOpacity: 0.22,
-  shadowRadius: 2.22,
-},
+    borderColor: '#27e62e',
+    borderWidth: 4,
+    backgroundColor: 'rgba(39, 230, 46, 0.1)',
+  },
+  currentAvatarIndicator: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 1,
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.22,
+    shadowRadius: 2.22,
+  },
 });
 
 export default Profile;

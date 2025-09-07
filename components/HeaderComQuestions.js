@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Image, StatusBar } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, Image, StatusBar, Alert } from "react-native";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { auth, db } from "../FirebaseConfig"; // Adjust path as needed
 import { doc, onSnapshot } from "firebase/firestore";
 import { useProfile } from '../context/ProfileContext';
 
-const HeaderReadStory = ({ navigation, availableLanguages, currentLanguage, onLanguageToggle }) => {
+const HeaderComsQuestions = ({ navigation, availableLanguages, currentLanguage, onLanguageToggle }) => {
   const { profileData } = useProfile();
   const [userStars, setUserStars] = useState(0);
   const insets = useSafeAreaInsets();
@@ -49,17 +49,34 @@ const HeaderReadStory = ({ navigation, availableLanguages, currentLanguage, onLa
     navigation.navigate("ProfileStack", { screen: "ProfileMain" });
   };
 
+  const handleExitPress = () => {
+    Alert.alert(
+      "Exit Quiz",
+      "Are you sure you want to exit? Your progress will not be saved.",
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        { 
+          text: "Exit", 
+          onPress: () => navigation.navigate('HomeTab', { screen: 'Home' }),
+          style: "destructive"
+        }
+      ]
+    );
+  };
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-      
       <View style={styles.headerRow}> 
         <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.backButton}
+          onPress={handleExitPress}
+          style={styles.exitButton}
         >          
-          <Ionicons name="arrow-back" size={20} color="white" />
+          <Ionicons name="close" size={22} color="white" />
         </TouchableOpacity>  
 
         <View style={styles.rightContainer}>
@@ -112,7 +129,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     minHeight: 30,
-    paddingHorizontal: 16,
     paddingVertical: 5,
     color: "#414141",
   },
@@ -178,8 +194,8 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginLeft: 5,
   },
-  backButton: {
-    backgroundColor: '#FFCF2D',
+  exitButton: {
+    backgroundColor: '#FF6B6B', // Red container
     borderRadius: 10,
     paddingVertical: 5,
     paddingHorizontal: 8,
@@ -233,4 +249,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default HeaderReadStory;
+export default HeaderComsQuestions;

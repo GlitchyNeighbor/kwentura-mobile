@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Image } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
-import { auth, db } from "../FirebaseConfig";
+import { auth, db } from "../FirebaseConfig"; // Adjust path as needed
 import { doc, onSnapshot } from "firebase/firestore";
+import { useProfile } from '../context/ProfileContext';
 
 const HeaderViewStory = ({ navigation }) => {
   const [userStars, setUserStars] = useState(0);
+  const { profileData } = useProfile();
 
   useEffect(() => {
     let unsubscribe;
@@ -41,6 +43,10 @@ const HeaderViewStory = ({ navigation }) => {
     };
   }, []);
 
+  const handleProfilePress = () => {
+    navigation.navigate("ProfileStack", { screen: "ProfileMain" });
+  };
+
   return (    
     <View style={styles.container}>
       <Image source={require('../images/Star.png')} style={styles.star1} />
@@ -58,12 +64,26 @@ const HeaderViewStory = ({ navigation }) => {
           <Ionicons name="arrow-back" size={20} color="white" />
         </TouchableOpacity>  
 
-        <View style={[styles.ratingBox, { marginLeft: 'auto' }]}>
-          <View style={styles.ratingContainer}>
-            <Ionicons name="star" size={15} color="#ffde24ff" style={styles.starIcon} />
-            <Text style={styles.ratingNumber}>{userStars}</Text>
+        <View style={styles.rightContainer}>
+          <View style={styles.statsContainer}>
+            <View style={styles.ratingBox}>
+              <View style={styles.ratingContainer}>
+                <Ionicons name="star" size={15} color="#ffde24ff" style={styles.starIcon} />
+                <Text style={styles.ratingNumber}>{userStars}</Text>
+              </View>
+            </View>
           </View>
-        </View>        
+     
+            {profileData.avatarConfig ? (
+              <Image
+                source={profileData.avatarConfig}
+                style={styles.notificationCircle}
+              />
+            ) : (
+              <View style={styles.defaultAvatarContainer} />
+            )}
+  
+        </View>
       </View>
     </View>
   );
@@ -71,6 +91,31 @@ const HeaderViewStory = ({ navigation }) => {
 
 const styles = StyleSheet.create({
   ratingBox: {
+    backgroundColor: '#979797bd',
+    borderRadius: 10,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  rightContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  notificationCircle: {
+    borderRadius: 100,
+    backgroundColor: "#979797bd",
+    width: 35,
+    height: 35,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  defaultAvatarContainer: {
     backgroundColor: '#979797bd',
     borderRadius: 10,
     paddingVertical: 7,

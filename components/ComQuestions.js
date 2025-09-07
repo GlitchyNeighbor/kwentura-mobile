@@ -11,11 +11,11 @@ import {
   Alert,
   ImageBackground,
 } from 'react-native';
-import { doc, getDoc, updateDoc, increment, setDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, increment, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../FirebaseConfig';
 import { CommonActions } from '@react-navigation/native';
-import AppHeader from './HeaderReadStory';
-import * as Speech from 'expo-speech';
+import AppHeader from './HeaderComQuestions';
+import { Audio } from 'expo-av';
 
 const ComQuestions = ({ route, navigation }) => {
   const { storyId, storyTitle } = route.params;
@@ -27,28 +27,84 @@ const ComQuestions = ({ route, navigation }) => {
   const [showResults, setShowResults] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [sound, setSound] = useState();
+  const [ttsUrls, setTtsUrls] = useState({ congratulations: '', encouragement: '' });
+
+  useEffect(() => {
+    const fetchTtsUrls = async () => {
+      try {
+        const congratulationsDoc = await getDoc(doc(db, 'tts_config', 'congratulations'));
+        const encouragementDoc = await getDoc(doc(db, 'tts_config', 'encouragement'));
+        
+        let congratulationsUrl = '';
+        if (congratulationsDoc.exists()) {
+          congratulationsUrl = congratulationsDoc.data().url;
+        }
+
+        let encouragementUrl = '';
+        if (encouragementDoc.exists()) {
+          encouragementUrl = encouragementDoc.data().url;
+        }
+        setTtsUrls({ congratulations: congratulationsUrl, encouragement: encouragementUrl });
+      } catch (err) {
+        console.error("Error fetching TTS URLs:", err);
+      }
+    };
+
+    fetchTtsUrls();
+  }, []);
+
+  async function playSoundFromUrl(url) {
+    if (sound) {
+      await sound.unloadAsync();
+    }
+    if (!url) {
+      console.log('Audio URL is not provided.');
+      return;
+    }
+    try {
+      const { sound: newSound } = await Audio.Sound.createAsync({ uri: url });
+      setSound(newSound);
+      await newSound.playAsync();
+    } catch (error) {
+      console.error("Failed to play sound", error);
+    }
+  }
+
+  useEffect(() => {
+    return sound
+      ? () => {
+          sound.unloadAsync();
+        }
+      : undefined;
+  }, [sound]);
 
   useEffect(() => {
     const fetchQuestions = async () => {
+      setLoading(true);
       try {
         const storyRef = doc(db, 'stories', storyId);
         const docSnap = await getDoc(storyRef);
 
         if (docSnap.exists()) {
           const data = docSnap.data();
-          if (data.comprehensionQuestions && Array.isArray(data.comprehensionQuestions)) {
-              const processedQuestions = data.comprehensionQuestions.map(q => ({
-                ...q,
-                correctAnswer: q.options[q.correctOptionIndex]
-              }));
-            setQuestions(processedQuestions);
-          }
+          const processedQuestions = (data.comprehensionQuestions || []).map(q => ({
+            ...q,
+            correctAnswer: q.options[q.correctOptionIndex]
+          }));
+          setQuestions(processedQuestions);
+
           if (data.moralLesson) {
             const processedMoralLesson = {
               ...data.moralLesson,
               correctAnswer: data.moralLesson.options[data.moralLesson.correctOptionIndex]
             };
             setMoralLessonQuestion(processedMoralLesson);
+          }
+          
+          // Auto-play the first question's audio
+          if (processedQuestions.length > 0 && processedQuestions[0].audioUrl) {
+            playSoundFromUrl(processedQuestions[0].audioUrl);
           }
         } else {
           setError("Story not found.");
@@ -64,16 +120,32 @@ const ComQuestions = ({ route, navigation }) => {
     fetchQuestions();
   }, [storyId]);
 
-  // Cleanup speech on component unmount
-  useEffect(() => {
-    return () => {
-      Speech.stop();
-    };
-  }, []);
+  const saveQuizResult = async (finalScore) => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const totalQuestions = questions.length + (moralLessonQuestion ? 1 : 0);
+
+    try {
+      const quizResultRef = doc(db, "students", user.uid, "quizScores", storyId);
+      await setDoc(quizResultRef, {
+        storyId: storyId,
+        storyTitle: storyTitle,
+        score: finalScore,
+        totalQuestions: totalQuestions,
+        completedAt: serverTimestamp(),
+      }, { merge: true });
+    } catch (error) {
+      console.error("Error saving quiz result:", error);
+    }
+  };
 
   useEffect(() => {
-    if (showResults && score > 0) {
-      addStars(score);
+    if (showResults) {
+      saveQuizResult(score);
+      if (score > 0) {
+        addStars(score);
+      }
     }
   }, [showResults, score]);
 
@@ -111,17 +183,23 @@ const ComQuestions = ({ route, navigation }) => {
 
     if (isCorrect) {
       setScore(score + 1);
-      Speech.speak("That's correct! Great job!", { language: 'en-US' });
+      playSoundFromUrl(ttsUrls.congratulations);
     } else {
-      Speech.speak("Not quite, but keep trying! You're doing great.", { language: 'en-US' });
+      playSoundFromUrl(ttsUrls.encouragement);
     }
 
     setSelectedOption(null);
-    if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
+    const nextIndex = currentQuestionIndex + 1;
+    if (nextIndex < questions.length) {
+      setCurrentQuestionIndex(nextIndex);
+      if (questions[nextIndex].audioUrl) {
+        setTimeout(() => playSoundFromUrl(questions[nextIndex].audioUrl), 1000); // Delay to allow feedback audio to play
+      }
     } else if (moralLessonQuestion) {
-      // If all comprehension questions are answered and there's a moral lesson question
-      setCurrentQuestionIndex(questions.length); // Move to the moral lesson question index
+      setCurrentQuestionIndex(questions.length);
+      if (moralLessonQuestion.audioUrl) {
+        setTimeout(() => playSoundFromUrl(moralLessonQuestion.audioUrl), 1000); // Delay for feedback audio
+      }
     } else {
       setShowResults(true);
     }
@@ -137,9 +215,9 @@ const ComQuestions = ({ route, navigation }) => {
 
     if (isCorrect) {
       setScore(score + 1);
-      Speech.speak("That's correct! Well done!", { language: 'en-US' });
+      playSoundFromUrl(ttsUrls.congratulations);
     } else {
-      Speech.speak("Good try! Keep learning.", { language: 'en-US' });
+      playSoundFromUrl(ttsUrls.encouragement);
     }
     setShowResults(true);
   };
@@ -149,7 +227,7 @@ const ComQuestions = ({ route, navigation }) => {
 
   if (loading) {
     return (
-      <ImageBackground source={require('../images/Home.png')} style={styles.background} resizeMode="cover">
+      <ImageBackground source={require('../images/DarkViewStory.png')} style={styles.background} resizeMode="cover">
         <SafeAreaView style={styles.container}>
           <ActivityIndicator size="large" color="#FFCF2D" />
           <Text style={styles.loadingText}>Loading questions...</Text>
@@ -160,7 +238,7 @@ const ComQuestions = ({ route, navigation }) => {
 
   if (error) {
     return (
-      <ImageBackground source={require('../images/Home.png')} style={styles.background} resizeMode="cover">
+      <ImageBackground source={require('../images/DarkViewStory.png')} style={styles.background} resizeMode="cover">
         <SafeAreaView style={styles.container}>
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.button}>
@@ -175,7 +253,6 @@ const ComQuestions = ({ route, navigation }) => {
     return (
       <ImageBackground source={require('../images/DarkViewStory.png')} style={styles.background} resizeMode="cover">
         
-        <AppHeader navigation={navigation} hideStars={true} />
         <SafeAreaView style={styles.container}>
 
           <Text style={styles.resultTitle}>🎉 Quiz Complete! 🎉</Text>
@@ -202,7 +279,7 @@ const ComQuestions = ({ route, navigation }) => {
 
   if (!currentQuestion && !isMoralLessonPhase) {
     return (
-      <ImageBackground source={require('../images/Home.png')} style={styles.background} resizeMode="cover">
+      <ImageBackground source={require('../images/DarkViewStory.png')} style={styles.background} resizeMode="cover">
         <SafeAreaView style={styles.container}>
           <Text style={styles.errorText}>No questions found for this story.</Text>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.button}>
@@ -218,8 +295,11 @@ const ComQuestions = ({ route, navigation }) => {
   return (
     <ImageBackground source={require('../images/DarkViewStory.png')} style={styles.background} resizeMode="cover">
       <SafeAreaView style={styles.safeArea}>
+        <ScrollView
+          contentContainerStyle={styles.scrollViewContent}
+          showsVerticalScrollIndicator={false}
+        >
         <AppHeader navigation={navigation} hideStars={true} />
-        <ScrollView contentContainerStyle={styles.scrollViewContent}>
           <Text style={styles.storyTitle}>{storyTitle}</Text>
           
           {displayQuestion.imageUrl && (
@@ -268,18 +348,17 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
+    paddingHorizontal: 16,
   },
   container: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
   },
   scrollViewContent: {
     flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 20,
   },
   storyTitle: {
     fontSize: 28,
@@ -290,6 +369,7 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.25)',
     textShadowOffset: { width: 1, height: 2 },
     textShadowRadius: 3,
+    marginTop: 100,
   },
   imageContainer: {
     width: '100%',
@@ -345,9 +425,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#007bff',
     padding: 15,
     borderRadius: 10,
-    marginTop: 20,
     width: '80%',
     alignItems: 'center',
+    marginBottom: 30,
   },
   buttonText: {
     color: '#fff',
