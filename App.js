@@ -845,8 +845,8 @@ function RootNavigator() {
   return (
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {!user || !user.emailVerified ? (
-          // 1. If no user or email is not verified, show Auth flow.
+        {!user ? (
+          // 1. If no user, show Auth flow.
           <Stack.Screen name="Auth" component={AuthStack} />
         ) : hasInitialDocument === false ? (
           // 2. User is verified, but NO Firestore doc exists. This is the state right after email verification.

@@ -32,57 +32,34 @@ export const ProfileProvider = ({ children }) => {
 
   // Effect to listen for unlocked animal avatars
   useEffect(() => {
-    const user = auth.currentUser;
-    if (!user) {
-      setUnlockedAnimalAvatars([]);
-      return;
-    }
-
-    const userDocRef = doc(db, "students", user.uid);
-    const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const unlockedRewardsArr = docSnap.data().unlockedRewards || [];
-        const unlockedSet = new Set(unlockedRewardsArr);
-        const animalAvatars = getUnlockedAnimalAvatars(unlockedSet);
-        setUnlockedAnimalAvatars(animalAvatars.length > 0 ? animalAvatars : []);
-      } else {
-        setUnlockedAnimalAvatars([]);
-      }
-    }, (error) => {
-      console.error("Error listening to unlocked animal avatars:", error);
-      setUnlockedAnimalAvatars([]);
-    });
-
-    return () => unsubscribe();
-  }, [auth.currentUser?.uid]);
-
-  // Effect to fetch and listen for profile data
-  useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(async (user) => {
-      setLoading(true);
+    const handleUserData = (user) => {
       if (user) {
-        try {
-          const docRef = doc(db, "students", user.uid);
-          const docSnap = await getDoc(docRef);
-
+        setLoading(true);
+        const docRef = doc(db, "students", user.uid);
+  
+        const unsubscribe = onSnapshot(docRef, (docSnap) => {
           if (docSnap.exists()) {
             const data = docSnap.data();
+            
+            // Process unlocked avatars
+            const unlockedRewardsArr = data.unlockedRewards || [];
+            const unlockedSet = new Set(unlockedRewardsArr);
+            const animalAvatars = getUnlockedAnimalAvatars(unlockedSet);
+            setUnlockedAnimalAvatars(animalAvatars.length > 0 ? animalAvatars : []);
+  
+            // Determine avatarConfig
             let avatarConfig = null;
-            if (
-              typeof data.avatarConfig === "number" &&
-              unlockedAnimalAvatars.length > 0 &&
-              unlockedAnimalAvatars[data.avatarConfig]
-            ) {
-              avatarConfig = unlockedAnimalAvatars[data.avatarConfig];
-            } else if (
-              unlockedAnimalAvatars.length > 0 &&
-              unlockedAnimalAvatars.includes(data.avatarConfig)
-            ) {
-              avatarConfig = data.avatarConfig;
-            } else if (unlockedAnimalAvatars.length > 0) {
-              avatarConfig = unlockedAnimalAvatars[0];
+            if (animalAvatars.length > 0) {
+              if (typeof data.avatarConfig === "number" && animalAvatars[data.avatarConfig]) {
+                avatarConfig = animalAvatars[data.avatarConfig];
+              } else if (animalAvatars.includes(data.avatarConfig)) {
+                avatarConfig = data.avatarConfig;
+              } else {
+                avatarConfig = animalAvatars[0];
+              }
             }
-
+  
+            // Set profile data
             setProfileData({
               parentFirstName: data.parentFirstName || "",
               parentLastName: data.parentLastName || "",
@@ -93,14 +70,33 @@ export const ProfileProvider = ({ children }) => {
               studentId: data.schoolId || "",
               gradeLevel: data.gradeLevel || "",
               section: data.section || "",
-              avatarConfig: avatarConfig
+              avatarConfig: avatarConfig,
             });
+          } else {
+            // Handle case where user document doesn't exist
+            setProfileData({
+              parentFirstName: "",
+              parentLastName: "",
+              email: "",
+              contactNumber: "",
+              studentFirstName: "",
+              studentLastName: "",
+              studentId: "",
+              gradeLevel: "",
+              section: "",
+              avatarConfig: null,
+            });
+            setUnlockedAnimalAvatars([]);
           }
-        } catch (error) {
-          console.error("Error fetching user data:", error);
-          // Alert.alert("Error", "Failed to fetch user data: " + error.message);
-        }
+          setLoading(false);
+        }, (error) => {
+          console.error("Error listening to user data:", error);
+          setLoading(false);
+        });
+  
+        return unsubscribe;
       } else {
+        // Handle user logout
         setProfileData({
           parentFirstName: "",
           parentLastName: "",
@@ -111,14 +107,20 @@ export const ProfileProvider = ({ children }) => {
           studentId: "",
           gradeLevel: "",
           section: "",
-          avatarConfig: unlockedAnimalAvatars.length > 0 ? unlockedAnimalAvatars[0] : null
+          avatarConfig: null,
         });
+        setUnlockedAnimalAvatars([]);
+        setLoading(false);
+        return () => {};
       }
-      setLoading(false);
-    });
-
-    return unsubscribe;
-  }, [unlockedAnimalAvatars]);
+    };
+  
+    const unsubscribeAuth = auth.onAuthStateChanged(handleUserData);
+  
+    return () => {
+      unsubscribeAuth();
+    };
+  }, []);
 
   const updateAvatar = useCallback(async (newAvatar) => {
     const user = auth.currentUser;

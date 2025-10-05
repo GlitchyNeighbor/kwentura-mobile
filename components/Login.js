@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect } from "react";
+import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import {
   TextInput,
   View,
@@ -14,6 +14,7 @@ import {
   ActivityIndicator,
   Keyboard,
   KeyboardAvoidingView,
+  Animated,
 } from "react-native";
 import { auth } from "../FirebaseConfig";
 import { signInWithEmailAndPassword } from "firebase/auth";
@@ -67,6 +68,7 @@ const Login = ({ navigation }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const titleOpacity = useRef(new Animated.Value(1)).current;
 
   // Memoized title letters to prevent unnecessary re-renders
   const titleLetters = useMemo(() => 
@@ -76,20 +78,33 @@ const Login = ({ navigation }) => {
     })), []
   );
 
-  // Keyboard visibility detection
   useEffect(() => {
-    const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => {
+    const showKeyboard = () => {
       setIsKeyboardVisible(true);
-    });
-    const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => {
+      Animated.timing(titleOpacity, {
+        toValue: 0, // Fade out
+        duration: 250,
+        useNativeDriver: true,
+      }).start();
+    };
+
+    const hideKeyboard = () => {
       setIsKeyboardVisible(false);
-    });
+      Animated.timing(titleOpacity, {
+        toValue: 1, // Fade in
+        duration: 250,
+        useNativeDriver: true,
+      }).start();
+    };
+
+    const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', showKeyboard);
+    const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', hideKeyboard);
 
     return () => {
       keyboardDidShowListener?.remove();
       keyboardDidHideListener?.remove();
     };
-  }, []);
+  }, [titleOpacity]);
 
   const togglePasswordVisibility = useCallback(() => {
     setShowPassword(prev => !prev);
@@ -275,13 +290,15 @@ const Login = ({ navigation }) => {
       <Image source={require('../images/Rainbow.png')} style={styles.rainbow} />
 
       {/* Title - Fixed position, won't move with keyboard */}
-      <View style={styles.titleContainer}>
+      <Animated.View
+        style={[styles.titleContainer, { opacity: titleOpacity }]}
+      >
         {titleLetters.map(({ letter, color }, index) => (
           <Text key={index} style={[styles.titleLetter, { color }]}>
             {letter}
           </Text>
         ))}
-      </View>
+      </Animated.View>
 
       {/* Form Container - Separate KeyboardAvoidingView */}
       <KeyboardAvoidingView

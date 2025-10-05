@@ -73,6 +73,7 @@ const Rewards = ({ navigation }) => {
   const searchTimeoutRef = useRef(null);
   const [boinkSound, setBoinkSound] = useState();
   const unlockedAvatarScale = useRef(new Animated.Value(1)).current;
+  const [clappingSound, setClappingSound] = useState();
 
   // Create animated values for each reward for bounce animation
   const animatedValues = useRef({});
@@ -144,6 +145,23 @@ const Rewards = ({ navigation }) => {
     loadSound();
 
     return () => boinkSound?.unloadAsync();
+  }, []);
+
+  useEffect(() => {
+    const loadSound = async () => {
+      try {
+        const { sound } = await Audio.Sound.createAsync(
+           require('../assets/sounds/clapping.mp3')
+        );
+        setClappingSound(sound);
+      } catch (error) {
+        console.error('Failed to load the clapping sound', error);
+      }
+    };
+
+    loadSound();
+
+    return () => clappingSound?.unloadAsync();
   }, []);
 
   // Effect to handle stars earned from quiz - REMOVED
@@ -237,7 +255,6 @@ const Rewards = ({ navigation }) => {
       });
 
       // Update local state (this will also be updated by the onSnapshot listener)
-      setUserStars(prev => prev - reward.starsRequired);
       setUnlockedRewards(prev => new Set([...prev, rewardId]));
 
       // Show styled unlocked modal instead of alert
@@ -247,6 +264,10 @@ const Rewards = ({ navigation }) => {
       // Congratulate the user with speech
       const speechMessage = `Congratulations ! You've unlocked the ${reward.title}!`;
       Speech.speak(speechMessage, { language: 'en-US' });
+
+      if (clappingSound) {
+        clappingSound.replayAsync();
+      }
 
     } catch (error) {
       console.error("Error unlocking reward:", error);
@@ -263,8 +284,6 @@ const Rewards = ({ navigation }) => {
       await updateDoc(userDocRef, {
         stars: increment(amount),
       });
-      
-      setUserStars(prev => prev + amount);
       
       Alert.alert(
         "Stars Earned! ⭐",
@@ -994,11 +1013,13 @@ const renderAnimalReward = (reward, index) => {
                     style={styles.previewAnimalCircleInner}
                   >
                     <View style={styles.previewUnlockedAnimalContainer}>
-                      <Image
-                        source={previewReward?.image}
-                        style={styles.previewAnimalImage}
-                        resizeMode="contain"
-                      />
+                      {previewReward?.image && (
+                        <Image
+                          source={previewReward.image}
+                          style={styles.previewAnimalImage}
+                          resizeMode="contain"
+                        />
+                      )}
                       {previewReward?.isUnlocked && (
                         <View style={styles.previewCrownContainer}>
                           <Text style={styles.previewCrownEmoji}>👑</Text>
@@ -1106,11 +1127,13 @@ const renderAnimalReward = (reward, index) => {
                       style={styles.unlockedAnimalCircleInner}
                     >
                       <View style={styles.unlockedAnimalImageContainer}>
-                        <Image
-                          source={unlockedReward?.image}
-                          style={styles.unlockedAnimalImage}
-                          resizeMode="contain"
-                        />
+                        {unlockedReward?.image && (
+                          <Image
+                            source={unlockedReward.image}
+                            style={styles.unlockedAnimalImage}
+                            resizeMode="contain"
+                          />
+                        )}
                         <View style={styles.unlockedCrownContainer}>
                           <Text style={styles.unlockedCrownEmoji}>👑</Text>
                         </View>

@@ -15,7 +15,8 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { getAuth, sendPasswordResetEmail } from 'firebase/auth';
-import { auth } from '../FirebaseConfig';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { auth, db } from '../FirebaseConfig';
 
 const ForgotPassword = ({ navigation }) => {
   const [emailOrPhone, setEmailOrPhone] = useState('');
@@ -24,30 +25,16 @@ const ForgotPassword = ({ navigation }) => {
 
   // Email validation regex
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  // Phone validation regex (basic international format)
-  const phoneRegex = /^[\+]?[1-9][\d]{0,15}$/;
 
   const validateInput = (input) => {
     const trimmedInput = input.trim();
     
     if (!trimmedInput) {
-      return 'Email or phone number is required';
+      return 'Email is required';
     }
     
-    // Check if it's an email or phone number
-    const isEmail = trimmedInput.includes('@');
-    const isPhone = /^\d/.test(trimmedInput.replace(/[\s\-\(\)\+]/g, ''));
-    
-    if (isEmail && !emailRegex.test(trimmedInput)) {
+    if (!emailRegex.test(trimmedInput)) {
       return 'Please enter a valid email address';
-    }
-    
-    if (isPhone && !phoneRegex.test(trimmedInput.replace(/[\s\-\(\)]/g, ''))) {
-      return 'Please enter a valid phone number';
-    }
-    
-    if (!isEmail && !isPhone) {
-      return 'Please enter a valid email or phone number';
     }
     
     return null;
@@ -65,37 +52,28 @@ const ForgotPassword = ({ navigation }) => {
     setErrors({});
     setIsLoading(true);
 
-    const isEmail = emailOrPhone.includes('@');
+    try {
+      // Check if email exists in students collection
+      const studentsRef = collection(db, "students");
+      const q = query(studentsRef, where("email", "==", emailOrPhone.trim()));
+      const querySnapshot = await getDocs(q);
 
-    if (isEmail) {
-      try {
-        await sendPasswordResetEmail(auth, emailOrPhone.trim());
-        Alert.alert(
-          'Password Reset Email Sent',
-          'Please check your email to reset your password.'
-        );
-        navigation.navigate('Login');
-      } catch (error) {
-        Alert.alert('Error', error.message);
-      } finally {
+      if (querySnapshot.empty) {
+        Alert.alert("Email Not Found", "The email address is not registered as a student.");
         setIsLoading(false);
+        return;
       }
-    } else {
-      // For phone numbers, navigate to the verification screen
-      try {
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        
-        // Navigate to verification screen
-        navigation.navigate('ChooseVerify', { 
-          emailOrPhone: emailOrPhone.trim(),
-          isEmail: false
-        });
-      } catch (error) {
-        Alert.alert('Error', 'Something went wrong. Please try again.');
-      } finally {
-        setIsLoading(false);
-      }
+
+      await sendPasswordResetEmail(auth, emailOrPhone.trim());
+      Alert.alert(
+        'Password Reset Email Sent',
+        'Please check your email to reset your password.'
+      );
+      navigation.navigate('Login');
+    } catch (error) {
+      Alert.alert('Error', error.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -169,7 +147,7 @@ const ForgotPassword = ({ navigation }) => {
               </Text>
               
               <Text style={styles.subheading}>
-                Please enter your email or mobile number to search for your account.
+                Please enter your email to search for your account.
               </Text>
 
               <View style={styles.inputContainer}>
@@ -178,7 +156,7 @@ const ForgotPassword = ({ navigation }) => {
                     styles.input,
                     errors.input && styles.inputError
                   ]}
-                  placeholder="Email or mobile number"
+                  placeholder="Email address"
                   placeholderTextColor="#999"
                   keyboardType="email-address"
                   autoCapitalize="none"
@@ -186,8 +164,8 @@ const ForgotPassword = ({ navigation }) => {
                   value={emailOrPhone}
                   onChangeText={handleInputChange}
                   editable={!isLoading}
-                  accessibilityLabel="Email or phone number input"
-                  accessibilityHint="Enter your email address or phone number to find your account"
+                  accessibilityLabel="Email address input"
+                  accessibilityHint="Enter your email address to find your account"
                 />
                 
                 {errors.input && (

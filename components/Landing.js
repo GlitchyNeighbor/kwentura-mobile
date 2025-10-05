@@ -209,8 +209,8 @@ const Landing = ({ navigation }) => {
         </View>       
 
         {/* UI elements (Title and Buttons) */}
-        <SafeAreaView style={styles.safeArea}>
-          <View style={styles.contentContainer}>          
+        <SafeAreaView style={styles.safeArea} pointerEvents="box-none">
+          <View style={styles.contentContainer} pointerEvents="box-none">
             <View style={styles.titleContainer}>
               <Text style={[styles.titleLetter, { color: '#E63B3B' }]}>K</Text>
               <Text style={[styles.titleLetter, { color: '#386CD2' }]}>w</Text>

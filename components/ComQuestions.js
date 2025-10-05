@@ -149,6 +149,30 @@ const ComQuestions = ({ route, navigation }) => {
     }
   }, [showResults, score]);
 
+  useEffect(() => {
+    let soundObject = null;
+
+    const playClappingSound = async () => {
+      try {
+        soundObject = new Audio.Sound();
+        await soundObject.loadAsync(require('../assets/sounds/clapping.mp3'));
+        await soundObject.playAsync();
+      } catch (error) {
+        console.error("Failed to play clapping sound", error);
+      }
+    };
+
+    if (score === 1) {
+      playClappingSound();
+    }
+
+    return () => {
+      if (soundObject) {
+        soundObject.unloadAsync();
+      }
+    };
+  }, [score]);
+
   const addStars = async (amount) => {
     const user = auth.currentUser;
     if (!user || amount <= 0) return;
@@ -172,6 +196,25 @@ const ComQuestions = ({ route, navigation }) => {
     setSelectedOption(option);
   };
 
+  const playSoundSequence = async (soundFiles) => {
+    for (const soundFile of soundFiles) {
+      try {
+        const { sound } = await Audio.Sound.createAsync(soundFile);
+        await sound.playAsync();
+        await new Promise(resolve => {
+          sound.setOnPlaybackStatusUpdate(async (status) => {
+            if (status.didJustFinish) {
+              await sound.unloadAsync();
+              resolve();
+            }
+          });
+        });
+      } catch (error) {
+        console.error('Failed to play sound file', error);
+      }
+    }
+  };
+
   const handleNextQuestion = () => {
     if (selectedOption === null) {
       Alert.alert("Please select an answer", "You must choose an option before proceeding.");
@@ -183,9 +226,13 @@ const ComQuestions = ({ route, navigation }) => {
 
     if (isCorrect) {
       setScore(score + 1);
-      playSoundFromUrl(ttsUrls.congratulations);
+      playSoundSequence([
+        require('../assets/sounds/correct.mp3'),
+      ]);
     } else {
-      playSoundFromUrl(ttsUrls.encouragement);
+      playSoundSequence([
+        require('../assets/sounds/wrong-answer.mp3'),
+      ]);
     }
 
     setSelectedOption(null);
@@ -215,9 +262,15 @@ const ComQuestions = ({ route, navigation }) => {
 
     if (isCorrect) {
       setScore(score + 1);
-      playSoundFromUrl(ttsUrls.congratulations);
+      playSoundSequence([
+        require('../assets/sounds/correct.mp3'),
+        require('../assets/sounds/congratulations.mp3')
+      ]);
     } else {
-      playSoundFromUrl(ttsUrls.encouragement);
+      playSoundSequence([
+        require('../assets/sounds/wrong-answer.mp3'),
+        require('../assets/sounds/encouragement.mp3')
+      ]);
     }
     setShowResults(true);
   };
@@ -260,13 +313,25 @@ const ComQuestions = ({ route, navigation }) => {
           <Text style={styles.starsEarnedText}>You earned {score} stars! ⭐</Text>
           <TouchableOpacity
             onPress={() => {
-              navigation.dispatch(
-                CommonActions.reset({
-                  index: 0,
-                  routes: [{ name: 'Home' }],
-                })
+              playSoundSequence([require('../assets/sounds/clapping.mp3')]);
+              Alert.alert(
+                "Congratulations!",
+                `You have earned ${score} stars!`,
+                [
+                  {
+                    text: "OK",
+                    onPress: () => {
+                      navigation.dispatch(
+                        CommonActions.reset({
+                          index: 0,
+                          routes: [{ name: 'Home' }],
+                        })
+                      );
+                      navigation.navigate('HomeTab');
+                    }
+                  }
+                ]
               );
-              navigation.navigate('HomeTab');
             }}
             style={styles.button}
           >

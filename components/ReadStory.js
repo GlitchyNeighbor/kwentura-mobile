@@ -725,7 +725,7 @@ const ReadStory = ({ route, navigation }) => {
                           ref={flatListRef}
                           data={pageImages}
                           renderItem={renderPage}
-                          keyExtractor={(item, index) => `${index}-${isLandscape ? 'landscape' : 'portrait'}`}
+                          keyExtractor={(item, index) => `${item}-${index}`}
                           horizontal
                           pagingEnabled
                           showsHorizontalScrollIndicator={false}

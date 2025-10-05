@@ -103,7 +103,6 @@ const Home = ({ navigation }) => {
   };
   
   useEffect(() => {
-    fetchStories();
     loadStoredSearchData();
     loadRecentlyViewedStories();
   }, []);
@@ -153,38 +152,48 @@ const Home = ({ navigation }) => {
   }, []);
 
   useEffect(() => {
-    const fetchStories = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const storiesCollectionRef = collection(db, "stories");
-        const q = query(
-          storiesCollectionRef,
-          orderBy("createdAt", "desc"),
-          limit(20)
-        );
+    const storyIds = new Set(stories.map(s => s.id));
 
-        const querySnapshot = await getDocs(q);
-        const fetchedStories = querySnapshot.docs.map((doc) => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            ...data,
-            imageUrl: data.image, // Map Firestore 'image' to 'imageUrl'
-            synopsis: data.generatedSynopsis || data.synopsis, // Map 'generatedSynopsis' or 'synopsis'
-          };
-        });
+    const updatedRecentlyViewed = recentlyViewedStories.filter(s => storyIds.has(s.id));
+    if (updatedRecentlyViewed.length < recentlyViewedStories.length) {
+      setRecentlyViewedStories(updatedRecentlyViewed);
+      saveRecentlyViewedStories(updatedRecentlyViewed);
+    }
 
-        setStories(fetchedStories);
-      } catch (error) {
-        console.error("Error fetching stories: ", error);
-        setError("Failed to fetch stories. Please try again later.");
-      } finally {
-        setLoading(false);
-      }
-    };
+    const updatedInProgress = inProgressStories.filter(s => storyIds.has(s.id));
+    if (updatedInProgress.length < inProgressStories.length) {
+      setInProgressStories(updatedInProgress);
+    }
 
-    fetchStories();
+  }, [stories]);
+
+  useEffect(() => {
+    setLoading(true);
+    setError(null);
+
+    const storiesCollectionRef = collection(db, "stories");
+    const q = query(storiesCollectionRef, orderBy("createdAt", "desc"));
+
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const fetchedStories = querySnapshot.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          imageUrl: data.image,
+          synopsis: data.generatedSynopsis || data.synopsis,
+        };
+      });
+
+      setStories(fetchedStories);
+      setLoading(false);
+    }, (error) => {
+      console.error("Error fetching stories: ", error);
+      setError("Failed to fetch stories. Please try again later.");
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   // Function to load recently viewed stories from AsyncStorage
@@ -440,34 +449,6 @@ const Home = ({ navigation }) => {
       return unsubscribe;
     } catch (error) {
       console.error("Error setting up bookmark listener: ", error);
-    }
-  };
-
-  const fetchStories = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const storiesCollectionRef = collection(db, "stories");
-      const q = query(storiesCollectionRef, orderBy("createdAt", "desc"));
-
-      const querySnapshot = await getDocs(q);
-      const fetchedStories = querySnapshot.docs.map((doc) => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          ...data,
-          imageUrl: data.image, // Map Firestore 'image' to 'imageUrl'
-          synopsis: data.generatedSynopsis || data.synopsis, // Map 'generatedSynopsis' or 'synopsis'
-        };
-      });
-
-      setStories(fetchedStories);
-      setFilteredStories(fetchedStories);
-    } catch (error) {
-      console.error("Error fetching stories: ", error);
-      setError("Failed to fetch stories. Please try again later.");
-    } finally {
-      setLoading(false);
     }
   };
 

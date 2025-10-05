@@ -36,6 +36,48 @@ const StudDetails = ({ navigation, route }) => {
   const [section, setSection] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false); // Renamed for clarity
+  const [schoolIdError, setSchoolIdError] = useState(""); // State for school ID error message
+
+  // New function to check if school ID exists
+  const checkSchoolIdExists = async (id, currentUserId) => {
+    if (!id) {
+      setSchoolIdError("");
+      return false;
+    }
+
+    try {
+      const studentsRef = collection(db, "students");
+      const q1 = query(studentsRef, where("schoolId", "==", id));
+      const studentsSnap = await getDocs(q1);
+
+      const teachersRef = collection(db, "teachers");
+      const q2 = query(teachersRef, where("schoolId", "==", id));
+      const teachersSnap = await getDocs(q2);
+
+      const adminRef = collection(db, "admins");
+      const q3 = query(adminRef, where("schoolId", "==", id));
+      const adminSnap = await getDocs(q3);
+
+      const existsInStudents =
+        !studentsSnap.empty &&
+        studentsSnap.docs.some((doc) => {
+          return doc.id !== currentUserId;
+        });
+      const existsInTeachers = !teachersSnap.empty;
+      const existsInAdmin = !adminSnap.empty;
+      if (existsInStudents || existsInTeachers || existsInAdmin) {
+        setSchoolIdError("This School ID is already registered. Please enter a unique School ID.");
+        return true;
+      } else {
+        setSchoolIdError("");
+        return false;
+      }
+    } catch (error) {
+      console.error("Error checking school ID existence:", error);
+      setSchoolIdError("Error checking School ID. Please try again.");
+      return true;
+    }
+  };
 
   useEffect(() => {
     if (!userId) {
@@ -65,35 +107,19 @@ const StudDetails = ({ navigation, route }) => {
       );
       return;
     }
+    // Check for existing school ID error before saving
+    if (schoolIdError) {
+      Alert.alert(
+        "Invalid School ID",
+        "Please correct the School ID before proceeding."
+      );
+      return;
+    }
+
     if (isSaving || isCancelling) return;
     setIsSaving(true);
 
     try {
-      // Check in students collection
-      const studentsRef = collection(db, "students");
-      const q1 = query(studentsRef, where("schoolId", "==", schoolId));
-      const studentsSnap = await getDocs(q1);
-
-      // Check in teachers collection (add more collections as needed)
-      const teachersRef = collection(db, "teachers");
-      const q2 = query(teachersRef, where("schoolId", "==", schoolId));
-      const teachersSnap = await getDocs(q2);
-
-      // If found in any collection and not the current user, alert
-      const existsInStudents =
-        !studentsSnap.empty &&
-        studentsSnap.docs.some((doc) => doc.id !== userId);
-      const existsInTeachers = !teachersSnap.empty; // Teachers likely have different IDs
-
-      if (existsInStudents || existsInTeachers) {
-        Alert.alert(
-          "School ID Exists",
-          "This School ID is already registered. Please enter a unique School ID."
-        );
-        setIsSaving(false);
-        return;
-      }
-
       await setDoc(
         doc(db, "students", userId),
         {
@@ -140,14 +166,27 @@ const StudDetails = ({ navigation, route }) => {
               // Delete the user from Firebase Authentication
               const user = auth.currentUser;
               if (user) {
-                // Deleting the user from Auth also signs them out automatically.
-                await deleteUser(user);
+                try {
+                  // Deleting the user from Auth also signs them out automatically.
+                  await deleteUser(user);
+                } catch (authError) {
+                  if (authError.code === 'auth/requires-recent-login') {
+                    // This is expected if the user took too long.
+                    // We can't re-authenticate, so we'll just sign them out.
+                    console.log('Cancellation: User requires recent login. Signing out.');
+                    await firebaseSignOut(auth);
+                  } else {
+                    // Re-throw other auth errors
+                    throw authError;
+                  }
+                }
               }
               // Route the user back to the Landing page after cancellation.
               navigation.navigate("Landing");
 
             } catch (error) {
               console.error("Error during cancellation:", error);
+              // Generic error for any failure in the process
               Alert.alert(
                 "Error",
                 "Could not complete the action. Please try again."
@@ -211,15 +250,20 @@ const StudDetails = ({ navigation, route }) => {
         onChangeText={setLastName}
         autoCapitalize="words"
       />
-      {/* Changed: School ID is now an editable input field */}
-      <TextInput
-        style={styles.input}
-        placeholder="Enter School ID"
-        value={schoolId}
-        onChangeText={setSchoolId}
-        autoCapitalize="none"
-        keyboardType="default"
-      />
+      <View style={styles.inputWrapper}>
+        <TextInput
+          style={[styles.input, { width: '100%', marginBottom: 0 }]}
+          placeholder="Enter School ID"
+          value={schoolId}
+          onChangeText={async (text) => {
+            setSchoolId(text);
+            await checkSchoolIdExists(text, userId);
+          }}
+          autoCapitalize="none"
+          keyboardType="default"
+        />
+        {schoolIdError ? <Text style={styles.errorText}>{schoolIdError}</Text> : null}
+      </View>
       <View style={styles.pickerContainer}>
         <Picker
           selectedValue={gradeLevel}
@@ -339,6 +383,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.07,
     shadowRadius: 2,
   },
+  inputWrapper: {
+    width: '90%',
+    marginBottom: 10,
+  },
   readOnlyInput: {
     backgroundColor: "#e9e9e9",
     color: "#555",
@@ -405,6 +453,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#fcdf7fff",
     borderColor: "#fcdf7fff",
     opacity: 0.7,
+  },
+  errorText: {
+    color: '#E63B3B', // A reddish color for errors
+    fontSize: 12,
+    marginTop: 4,
+    marginLeft: 8,
   },
   star1: {
     position: 'absolute',

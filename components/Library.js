@@ -18,6 +18,7 @@ import {
   collection,
   onSnapshot,
   doc,
+  getDoc, // Import getDoc
   deleteDoc,
   orderBy,
   query,
@@ -62,25 +63,28 @@ const Library = ({ navigation }) => {
       const bookmarksRef = collection(db, "students", userId, "bookmarks");
       const q = query(bookmarksRef, orderBy("bookmarkedAt", "desc"));
 
-      // Real-time listener for bookmarks
-      const unsubscribe = onSnapshot(
-        q,
-        (snapshot) => {
-          const bookmarks = [];
-          snapshot.forEach((doc) => {
-            bookmarks.push({
-              id: doc.id,
-              ...doc.data(),
-            });
-          });
-          setBookmarkedStories(bookmarks);
-          setLoading(false);
-        },
-        (error) => {
-          console.error("Error loading bookmarks: ", error);
-          setLoading(false);
-        }
-      );
+      const unsubscribe = onSnapshot(q, async (snapshot) => {
+        const bookmarksPromises = snapshot.docs.map(async (bookmarkDoc) => {
+          const storyRef = doc(db, "stories", bookmarkDoc.id);
+          const storySnap = await getDoc(storyRef);
+
+          if (storySnap.exists()) {
+            return { id: bookmarkDoc.id, ...bookmarkDoc.data() };
+          } else {
+            // Story doesn't exist, so delete the bookmark
+            console.log(`Story with ID ${bookmarkDoc.id} not found, deleting bookmark.`);
+            await deleteDoc(doc(db, "students", userId, "bookmarks", bookmarkDoc.id));
+            return null;
+          }
+        });
+
+        const bookmarks = (await Promise.all(bookmarksPromises)).filter(Boolean);
+        setBookmarkedStories(bookmarks);
+        setLoading(false);
+      }, (error) => {
+        console.error("Error loading bookmarks: ", error);
+        setLoading(false);
+      });
 
       return unsubscribe;
     } catch (error) {
@@ -94,27 +98,29 @@ const Library = ({ navigation }) => {
       const progressRef = collection(db, "students", userId, "progress");
       const q = query(progressRef, orderBy("lastReadAt", "desc"));
 
-      // Real-time listener for reading progress
-      const unsubscribe = onSnapshot(
-        q,
-        (snapshot) => {
-          const progress = [];
-          snapshot.forEach((doc) => {
-            const data = doc.data();
-            // Only include stories that are not completed (currentPage < totalPages - 1)
+      const unsubscribe = onSnapshot(q, async (snapshot) => {
+        const progressPromises = snapshot.docs.map(async (progressDoc) => {
+          const storyRef = doc(db, "stories", progressDoc.id);
+          const storySnap = await getDoc(storyRef);
+
+          if (storySnap.exists()) {
+            const data = progressDoc.data();
             if (data.currentPage < data.totalPages - 1) {
-              progress.push({
-                id: doc.id,
-                ...data,
-              });
+              return { id: progressDoc.id, ...data };
             }
-          });
-          setInProgressStories(progress);
-        },
-        (error) => {
-          console.error("Error loading progress: ", error);
-        }
-      );
+          } else {
+            // Story doesn't exist, so delete the progress entry
+            console.log(`Story with ID ${progressDoc.id} not found, deleting progress entry.`);
+            await deleteDoc(doc(db, "students", userId, "progress", progressDoc.id));
+          }
+          return null;
+        });
+
+        const progress = (await Promise.all(progressPromises)).filter(Boolean);
+        setInProgressStories(progress);
+      }, (error) => {
+        console.error("Error loading progress: ", error);
+      });
 
       return unsubscribe;
     } catch (error) {
